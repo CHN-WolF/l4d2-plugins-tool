@@ -1,4 +1,4 @@
-# 求生之路2 插件同步配置（改完保存即可，双击 update_installed.bat 用菜单操作）
+# 求生之路2 插件同步配置（改完保存即可，双击 l4d2-plugins-tool.bat 用菜单操作）
 #
 # game_dir 指向带 addons\sourcemod 的 left4dead2 目录。
 # 写成上一级 “Left 4 Dead 2” 也可以，程序会自动进入 left4dead2。

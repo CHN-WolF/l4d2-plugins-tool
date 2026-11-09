@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""l4d2-plugins-install-update-tool: 同步 L4D2 SourceMod 插件仓库并检测 Require 依赖。"""
+"""l4d2-plugins-tool: 同步 L4D2 SourceMod 插件仓库并检测 Require 依赖。"""
 
 from __future__ import annotations
 
@@ -395,7 +395,7 @@ class LocalEnv:
 def default_config_text(game_dir: Path | None = None) -> str:
     path = game_dir or Path(r"D:\Steam\steamapps\common\Left 4 Dead 2\left4dead2")
     return (
-        "# 求生之路2 插件同步配置（改完保存即可，双击 update_installed.bat 用菜单操作）\n"
+        "# 求生之路2 插件同步配置（改完保存即可，双击 l4d2-plugins-tool.bat 用菜单操作）\n"
         "#\n"
         "# game_dir 指向带 addons\\sourcemod 的 left4dead2 目录。\n"
         "# 写成上一级 “Left 4 Dead 2” 也可以，程序会自动进入 left4dead2。\n"
@@ -4270,12 +4270,7 @@ def install_l4d2_weapons(game_dir: Path) -> str:
 
 
 def _zombie_spawn_fix_sources(game_dir: Path) -> tuple[Path, Path]:
-    """Return (sp, gamedata) paths to install from. Prefer local patch pack, else GitHub cache."""
-    local = Path(__file__).resolve().parent / "patches" / "zombie_spawn_fix"
-    sp = local / "zombie_spawn_fix.sp"
-    gd = local / "zombie_spawn_fix.txt"
-    if sp.is_file() and gd.is_file():
-        return sp, gd
+    """Return (sp, gamedata) from umlka/l4d2 cache（作者仓库）。"""
     repo = cache_git_repo("umlka/l4d2")
     src = repo / "zombie_spawn_fix"
     sp = src / "zombie_spawn_fix.sp"
