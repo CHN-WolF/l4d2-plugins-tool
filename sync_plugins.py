@@ -42,6 +42,12 @@ GAME_DIR_MAP = {
     "materials": "materials",
     "models": "models",
     "particles": "particles",
+    "scripts": "scripts",
+}
+# 安装/更新该仓库任一插件时，额外整包同步的目录（相对仓库根）
+# addons/sourcemod → 游戏 addons/sourcemod；scripts → 游戏 scripts（含 vscripts）
+REPO_EXTRA_INSTALL_TREES: dict[str, tuple[str, ...]] = {
+    "matthewneko/nekospecials-l4d2": ("addons/sourcemod", "scripts"),
 }
 
 SKIP_TOP_DIRS = {
@@ -87,16 +93,23 @@ MD_LINK_RE = re.compile(
 )
 AM_ATTACH_RE = re.compile(r"attachmentid=(\d+)", re.I)
 AM_COMPILER_RE = re.compile(r"vbcompiler\.php\?file_id=(\d+)", re.I)
-COMMAND_BUFFER_SP_URL = (
-    "https://forums.alliedmods.net/attachment.php"
-    "?s=44f0a096b0ccc27fa4edb3f93ae0037a&attachmentid=170776&d=1781971302"
+# Silvers 官方仓库，避免 AlliedMods Cloudflare / Chrome 调试下载
+COMMAND_BUFFER_URL = "https://github.com/SilvDev/Command_Buffer"
+ATTACHMENTS_API_URL = "https://github.com/SilvDev/Attachments_API"
+# Silvers: Bots Ignore PipeBombs and Shoot（gamedata 在论坛附件）
+PIPEBOMB_IGNORE_URL = "https://forums.alliedmods.net/showthread.php?p=2752757"
+PIPEBOMB_IGNORE_GD_URL = (
+    "https://forums.alliedmods.net/attachment.php?attachmentid=191615&d=1632796354"
 )
+PIPEBOMB_IGNORE_SMX_URL = (
+    "https://forums.alliedmods.net/attachment.php?attachmentid=191616&d=1632796354"
+)
+COMMAND_BUFFER_SP_URL = COMMAND_BUFFER_URL
 LADDER_PATCH_SP_URL = "https://forums.alliedmods.net/attachment.php?attachmentid=193611&d=1644698569"
 REMOVE_ITEM_COLLISION_SP_URL = (
     "https://forums.alliedmods.net/attachment.php?attachmentid=188755&d=1655402146"
 )
 AM_SOURCE_SP_BY_AID = {
-    "170776": {"name": "command_buffer.sp", "url": COMMAND_BUFFER_SP_URL},
     "193611": {"name": "l4d2_ladder_patch.sp", "url": LADDER_PATCH_SP_URL},
     "188755": {"name": "l4d_remove_item_collision.sp", "url": REMOVE_ITEM_COLLISION_SP_URL},
 }
@@ -133,6 +146,12 @@ GD_LOAD_STR_RE = re.compile(
     r'(?:LoadGameConfigFile|GameDataWrapper|(?:new\s+)?GameData)\s*\(\s*"([^"]+)"\s*\)'
 )
 GD_LOAD_MACRO_RE = re.compile(r"LoadGameConfigFile\s*\(\s*(GAMEDATA(?:_FILE)?)\s*\)")
+# 源码里引用的 data/configs 相对路径（安装时需一并拷贝）
+SM_SUPPORT_PATH_RE = re.compile(
+    r'["\']((?:data|configs)/[^"\'%]+\.(?:cfg|txt|ini))["\']',
+    re.I,
+)
+_GAMEDATA_CACHE_INDEX: dict[str, list[Path]] | None = None
 GITHUB_REPO_RE = re.compile(
     r"https?://github\.com/([\w.\-]+)/([\w.\-]+?)(?:\.git)?(?=/|$|\?|#)",
     re.I,
@@ -169,6 +188,61 @@ WITCH_PIPEBOMB_URL = (
     "left%204%20fix/general/witch_pipebomb_exploit_fix_%26_death_optmizer.sp"
 )
 SOURCE_KEYVALUES_URL = "https://github.com/fdxx/l4d2_source_keyvalues"
+# lakwsh/l4dtoolz 配套补丁：非 30tick 下 Boomer 喷吐距离 + 可选 a2s_fix
+L4D2_VOMIT_FIX_URL = "https://github.com/lakwsh/l4d2_vomit_fix"
+L4D_HEARTBEAT_URL = (
+    "https://github.com/fbef0102/L4D1_2-Plugins/tree/master/l4d_heartbeat"
+)
+L4D2_CHAINSAW_FIX_URL = (
+    "https://github.com/fbef0102/L4D1_2-Plugins/tree/master/l4d2_chainsaw_fix"
+)
+L4D1_2_TREE = "https://github.com/fbef0102/L4D1_2-Plugins/tree/master"
+# hunter_growl_sound_fix 替代（按引擎分源）
+VOICE_MECHANICS_FIX_URL_L4D2 = (
+    "https://github.com/SirPlease/L4D2-Competitive-Rework/blob/master/"
+    "addons/sourcemod/scripting/l4d2_voice_mechanics_fix.sp"
+)
+VOICE_MECHANICS_FIX_URL_L4D1 = (
+    "https://github.com/fbef0102/Rotoblin-AZMod/blob/master/"
+    "SourceCode/scripting-az/l4d2_voice_mechanics_fix.sp"
+)
+CHARGING_TAKEDAMAGE_PATCH_URL = f"{L4D1_2_TREE}/charging_takedamage_patch"
+AI_HUNTER_SKEET_DMG_FIX_URL = f"{L4D1_2_TREE}/l4d_ai_hunter_skeet_dmg_fix"
+L4D_FIX_ROCKET_JUMP_URL = (
+    "https://github.com/Target5150/MoYu_Server_Stupid_Plugins/tree/master/"
+    "The%20Last%20Stand/l4d_fix_rocket_jump"
+)
+L4D_TRANSITION_ENTITY_URL = (
+    "https://github.com/Target5150/MoYu_Server_Stupid_Plugins/tree/master/"
+    "The%20Last%20Stand/l4d_transition_entity"
+)
+L4D_PAUSE_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Server_%E4%BC%BA%E6%9C%8D%E5%99%A8/l4d_pause"
+)
+L4D_PERCENTAGE_AMMOPILE_URL = "https://forums.alliedmods.net/showthread.php?t=340484"
+REMOVE_TOUCH_LINKS_URL = "https://github.com/shqke/sp_public/tree/master/remove_touch_links"
+L4D2_VOTE_CHANGE_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Server_%E4%BC%BA%E6%9C%8D%E5%99%A8/l4d2_vote_change"
+)
+L4D_ITEM_PASSER_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Items_%E7%89%A9%E5%93%81/l4d_item_passer"
+)
+L4D_POUNCE_DATABASE_REMAKE_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Hunter_Hunter/l4d_pounce_database_remake"
+)
+L4D_SKEET_DATABASE_REMAKE_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Hunter_Hunter/l4d_skeet_database_remake"
+)
+L4D_VOCALIZE_ANTIFLOOD_URL = (
+    "https://github.com/fbef0102/Game-Private_Plugin/tree/main/"
+    "L4D_%E6%8F%92%E4%BB%B6/Anti_Griefer_%E9%98%B2%E6%83%A1%E6%84%8F%E8%B7%AF%E4%BA%BA/"
+    "l4d_vocalize_antiflood"
+)
 BUILTINVOTES_URL = "https://github.com/fbef0102/builtinvotes/releases"
 BUILTINVOTES_WIN_ZIPS = [
     "https://github.com/fbef0102/builtinvotes/releases/download/v0.8.0/builtinvotes-sm1.12-win.0.8.0.zip",
@@ -180,6 +254,10 @@ REQUIRE_INSTALL_URLS = {
     "sceneprocessor": "https://forums.alliedmods.net/showthread.php?p=2766130",
     "l4d2_source_keyvalues": SOURCE_KEYVALUES_URL,
     "builtinvotes": BUILTINVOTES_URL,
+    "command_buffer": COMMAND_BUFFER_URL,
+    "attachments_api": ATTACHMENTS_API_URL,
+    "l4d_attachments_api": ATTACHMENTS_API_URL,
+    "l4d_pipebomb_ignore": PIPEBOMB_IGNORE_URL,
     "linux_auto_restart": "https://github.com/fbef0102/Sourcemod-Plugins/tree/main/linux_auto_restart",
     "server_loader": "https://github.com/fbef0102/Sourcemod-Plugins/tree/main/server_loader",
     "smd_advertisements": "https://github.com/fbef0102/Sourcemod-Plugins/tree/main/smd_advertisements",
@@ -187,6 +265,58 @@ REQUIRE_INSTALL_URLS = {
     "cannounce": "https://github.com/fbef0102/Sourcemod-Plugins/tree/main/cannounce",
     "left4dhooks": "https://github.com/SilvDev/Left4DHooks",
     "all4dead2": "https://github.com/fbef0102/L4D1_2-Plugins/tree/master/all4dead2",
+    "l4d2_vomit_fix": L4D2_VOMIT_FIX_URL,
+    "l4d2_a2s_fix": L4D2_VOMIT_FIX_URL,
+    "l4d_heartbeat": L4D_HEARTBEAT_URL,
+    "l4d2_chainsaw_fix": L4D2_CHAINSAW_FIX_URL,
+    "l4d2_voice_mechanics_fix": VOICE_MECHANICS_FIX_URL_L4D2,
+    "charging_takedamage_patch": CHARGING_TAKEDAMAGE_PATCH_URL,
+    "l4d_ai_hunter_skeet_dmg_fix": AI_HUNTER_SKEET_DMG_FIX_URL,
+    "l4d_fix_rocket_jump": L4D_FIX_ROCKET_JUMP_URL,
+    "l4d_transition_entity": L4D_TRANSITION_ENTITY_URL,
+    "l4d_pause": L4D_PAUSE_URL,
+    "l4d_percentage_ammopile": L4D_PERCENTAGE_AMMOPILE_URL,
+    "remove_touch_links": REMOVE_TOUCH_LINKS_URL,
+    "l4d2_vote_change": L4D2_VOTE_CHANGE_URL,
+    "l4d_item_passer": L4D_ITEM_PASSER_URL,
+    "l4d_pounce_database_remake": L4D_POUNCE_DATABASE_REMAKE_URL,
+    "l4d_skeet_database_remake": L4D_SKEET_DATABASE_REMAKE_URL,
+    "l4d_vocalize_antiflood": L4D_VOCALIZE_ANTIFLOOD_URL,
+    # 停更插件名也指向替代来源，便于 Require/目录覆盖
+    "server_sub_101d7cb0_detour": L4D2_CHAINSAW_FIX_URL,
+    "hunter_growl_sound_fix": VOICE_MECHANICS_FIX_URL_L4D2,
+    "l4d2_ai_damagefix": CHARGING_TAKEDAMAGE_PATCH_URL,
+    "l4d2_block_rocketjump": L4D_FIX_ROCKET_JUMP_URL,
+    "l4d2_transition_forward": L4D_TRANSITION_ENTITY_URL,
+    "l4d2pause": L4D_PAUSE_URL,
+    "l4d_limited_ammo_pile": L4D_PERCENTAGE_AMMOPILE_URL,
+    "l4d_switch_team_survivor_dead_fix": REMOVE_TOUCH_LINKS_URL,
+    "l4d_votes_5": L4D2_VOTE_CHANGE_URL,
+    "pill_passer": L4D_ITEM_PASSER_URL,
+    "pounce_database": L4D_POUNCE_DATABASE_REMAKE_URL,
+    "skeet_database": L4D_SKEET_DATABASE_REMAKE_URL,
+    "vocal_block": L4D_VOCALIZE_ANTIFLOOD_URL,
+}
+# 停更插件 → 主替代插件（同步/安装/Require 一律改用替代，并禁用旧 .smx）
+# 来源: fbef0102/L4D1_2-Plugins 各插件 readme「discontinued / 停止更新」说明
+PLUGIN_REPLACEMENTS: dict[str, str] = {
+    "server_sub_101d7cb0_detour": "l4d2_chainsaw_fix",
+    "hunter_growl_sound_fix": "l4d2_voice_mechanics_fix",
+    "l4d2_ai_damagefix": "charging_takedamage_patch",
+    "l4d2_block_rocketjump": "l4d_fix_rocket_jump",
+    "l4d2_transition_forward": "l4d_transition_entity",
+    "l4d2pause": "l4d_pause",
+    "l4d_limited_ammo_pile": "l4d_percentage_ammopile",
+    "l4d_switch_team_survivor_dead_fix": "remove_touch_links",
+    "l4d_votes_5": "l4d2_vote_change",
+    "pill_passer": "l4d_item_passer",
+    "pounce_database": "l4d_pounce_database_remake",
+    "skeet_database": "l4d_skeet_database_remake",
+    "vocal_block": "l4d_vocalize_antiflood",
+}
+# 停更时装主替代之外还要一并安装的配套插件
+PLUGIN_REPLACEMENT_ALSO: dict[str, list[str]] = {
+    "l4d2_ai_damagefix": ["l4d_ai_hunter_skeet_dmg_fix"],
 }
 # 指定插件只认唯一 GitHub 来源，其它仓库同名项不参与检测/同步，避免重复覆盖。
 # value: (owner/repo, 可选子目录名；None 表示该仓库整仓即为该插件)
@@ -214,10 +344,27 @@ PLUGIN_EXTRA_REQUIRES = {
     "l4d2_vscript_purifier": [
         ("l4d2_source_keyvalues", SOURCE_KEYVALUES_URL),
     ],
+    "l4dtoolz": [
+        ("l4d2_vomit_fix", L4D2_VOMIT_FIX_URL),
+    ],
+    "l4d2_ty_saveweapons": [
+        ("l4d_heartbeat", L4D_HEARTBEAT_URL),
+    ],
 }
 PLUGIN_REQUIRED_GAMEDATA = {
     "l4d_use_priority": ("l4d_use_priority",),
     "use_priority": ("l4d_use_priority",),
+    "l4d_pipebomb_ignore": ("l4d_pipebomb_ignore",),
+}
+# 已知 gamedata 直链（本地缺文件时优先下载，避免只靠仓库缓存）
+GAMEDATA_FETCH_URLS: dict[str, str] = {
+    "l4d_pipebomb_ignore.txt": PIPEBOMB_IGNORE_GD_URL,
+    "l4d_pipebomb_ignore": PIPEBOMB_IGNORE_GD_URL,
+}
+# 已知仅支持单一引擎的 Require/插件（无本地 .sp 也能判断，L4D2 上不装）
+ENGINE_ONLY_PLUGIN_KEYS: dict[str, str] = {
+    "l4d_fix_tank_jointeam": "l4d1",
+    "l4d_fix_tank_join_team": "l4d1",
 }
 AC_NAME_RE = re.compile(
     r"smac|anti[- ]?cheat|little[- ]?anti|sendfilefix|spray_exploit|"
@@ -1211,10 +1358,15 @@ def apply_require_url_overrides(requires: list[Requirement]) -> list[Requirement
             continue
         key = dep_merge_key(req)
         slug = (req.slug or "").lower().replace("-", "_")
+        name_key = normalize_key(req.name).replace(" ", "_")
         if key in REQUIRE_INSTALL_URLS:
             req.url = REQUIRE_INSTALL_URLS[key]
         elif slug in REQUIRE_INSTALL_URLS:
             req.url = REQUIRE_INSTALL_URLS[slug]
+        elif name_key in REQUIRE_INSTALL_URLS:
+            req.url = REQUIRE_INSTALL_URLS[name_key]
+        elif "t=325651" in (req.url or "").lower():
+            req.url = ATTACHMENTS_API_URL
     return requires
 
 
@@ -1751,12 +1903,178 @@ def scan_local_env(game_dir: Path) -> LocalEnv:
     )
 
 
+def plugin_key_norm(name: str) -> str:
+    return re.sub(r"[^\w]+", "_", (name or "").lower()).strip("_")
+
+
+def plugin_replacement_of(*names: str) -> str | None:
+    """若名称/URL 属于停更插件，返回主替代插件名。"""
+    for raw in names:
+        if not raw:
+            continue
+        key = plugin_key_norm(raw)
+        if key in PLUGIN_REPLACEMENTS:
+            return PLUGIN_REPLACEMENTS[key]
+        key2 = normalize_key(raw).replace(" ", "_")
+        if key2 in PLUGIN_REPLACEMENTS:
+            return PLUGIN_REPLACEMENTS[key2]
+        text = key if key else (raw or "").lower().replace("-", "_")
+        for old, new in PLUGIN_REPLACEMENTS.items():
+            if old in text:
+                return new
+    return None
+
+
+def discontinued_plugin_key(*names: str) -> str | None:
+    """返回命中的停更插件规范名（用于查 PLUGIN_REPLACEMENT_ALSO）。"""
+    for raw in names:
+        if not raw:
+            continue
+        key = plugin_key_norm(raw)
+        if key in PLUGIN_REPLACEMENTS:
+            return key
+        key2 = normalize_key(raw).replace(" ", "_")
+        if key2 in PLUGIN_REPLACEMENTS:
+            return key2
+        text = key if key else (raw or "").lower().replace("-", "_")
+        for old in PLUGIN_REPLACEMENTS:
+            if old in text:
+                return old
+    return None
+
+
+def plugin_replacement_bundle(*names: str) -> list[str]:
+    """停更插件对应的主替代 + 配套列表；非停更返回空。"""
+    old = discontinued_plugin_key(*names)
+    if not old:
+        return []
+    primary = PLUGIN_REPLACEMENTS[old]
+    extras = PLUGIN_REPLACEMENT_ALSO.get(old, [])
+    out = [primary]
+    for name in extras:
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def require_install_url_for(name: str, game_dir: Path | None = None) -> str:
+    """解析插件安装 URL（含按引擎区分的替代源）。"""
+    key = plugin_key_norm(name)
+    if key == "l4d2_voice_mechanics_fix" and game_dir is not None:
+        if game_engine_id(game_dir) == "l4d1":
+            return VOICE_MECHANICS_FIX_URL_L4D1
+        return VOICE_MECHANICS_FIX_URL_L4D2
+    if key == "hunter_growl_sound_fix" and game_dir is not None:
+        if game_engine_id(game_dir) == "l4d1":
+            return VOICE_MECHANICS_FIX_URL_L4D1
+        return VOICE_MECHANICS_FIX_URL_L4D2
+    return REQUIRE_INSTALL_URLS.get(key, "")
+
+
+def disable_plugin_smx(game_dir: Path, stem: str, reason: str = "") -> str | None:
+    """将 plugins/<stem>.smx 移到 disabled（大小写不敏感）。"""
+    want = plugin_key_norm(stem)
+    if not want:
+        return None
+    sm = sm_root(game_dir)
+    plugins = sm / "plugins"
+    if not plugins.is_dir():
+        return None
+    src: Path | None = None
+    for p in plugins.glob("*.smx"):
+        if plugin_key_norm(p.stem) == want:
+            src = p
+            break
+    if src is None or not src.is_file():
+        return None
+    dest_dir = plugins / "disabled"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
+    try:
+        if dest.exists():
+            dest.unlink()
+        shutil.move(str(src), str(dest))
+    except OSError as e:
+        return f"无法禁用 {src.name}: {e}"
+    note = reason or "已禁用"
+    return f"{note}: {src.name} -> plugins/disabled/"
+
+
+def retire_superseded_plugins(game_dir: Path, *active: str) -> list[str]:
+    """安装替代插件后，禁用对应的停更插件。"""
+    active_keys = {plugin_key_norm(a) for a in active if a}
+    # 配套插件也算“已装替代”
+    for old, extras in PLUGIN_REPLACEMENT_ALSO.items():
+        primary = PLUGIN_REPLACEMENTS.get(old)
+        if primary and primary in active_keys:
+            active_keys.update(plugin_key_norm(x) for x in extras)
+        if any(plugin_key_norm(x) in active_keys for x in extras):
+            if primary:
+                active_keys.add(primary)
+    notes: list[str] = []
+    for old, new in PLUGIN_REPLACEMENTS.items():
+        if active_keys and new not in active_keys:
+            continue
+        msg = disable_plugin_smx(game_dir, old, f"已由 {new} 替代，禁用旧插件")
+        if msg:
+            notes.append(msg)
+    return notes
+
+
+def ensure_replacement_also(
+    game_dir: Path,
+    *names: str,
+    dry_run: bool = False,
+) -> list[str]:
+    """为停更替换补齐 PLUGIN_REPLACEMENT_ALSO 配套插件。"""
+    olds: set[str] = set()
+    for raw in names:
+        old = discontinued_plugin_key(raw)
+        if old:
+            olds.add(old)
+            continue
+        key = plugin_key_norm(raw)
+        for disc, primary in PLUGIN_REPLACEMENTS.items():
+            if primary == key or key in {
+                plugin_key_norm(x) for x in PLUGIN_REPLACEMENT_ALSO.get(disc, [])
+            }:
+                olds.add(disc)
+    notes: list[str] = []
+    env = scan_local_env(game_dir)
+    for old in sorted(olds):
+        for also in PLUGIN_REPLACEMENT_ALSO.get(old, []):
+            url = require_install_url_for(also, game_dir)
+            req = Requirement(name=also, url=url, slug=also)
+            if check_requirement(req, env).ok:
+                continue
+            if dry_run:
+                notes.append(f"预览: 将安装配套 {also}")
+                continue
+            print(f"   配套替代: {also}")
+            notes.append(
+                try_install_requirement(req, env, False, _skip_also=True)
+            )
+            env = scan_local_env(game_dir)
+    return notes
+
+
 def match_plugins(
     remote: list[RemotePlugin], local: list[LocalPlugin]
 ) -> tuple[list[tuple[RemotePlugin, list[LocalPlugin]]], list[RemotePlugin], list[LocalPlugin]]:
     local_by_name: dict[str, list[LocalPlugin]] = {}
     for lp in local:
         local_by_name.setdefault(lp.name.lower(), []).append(lp)
+    # 本地仍装着停更插件时，挂到替代名下，同步时装替代品并随后禁用旧文件
+    for old, new in PLUGIN_REPLACEMENTS.items():
+        if old not in local_by_name:
+            continue
+        bucket = local_by_name.setdefault(new, [])
+        seen = {h.path.resolve() for h in bucket}
+        for lp in local_by_name[old]:
+            key = lp.path.resolve()
+            if key not in seen:
+                bucket.append(lp)
+                seen.add(key)
 
     matched: list[tuple[RemotePlugin, list[LocalPlugin]]] = []
     used_local: set[str] = set()
@@ -1939,29 +2257,80 @@ def resolve_dest(
     return dest_base / rel
 
 
+def iter_repo_extra_tree_files(repo: RepoSpec) -> list[tuple[Path, str, Path]]:
+    """仓库级共享目录（如 NekoSpecials 的 addons/sourcemod、scripts/vscripts）。"""
+    trees = REPO_EXTRA_INSTALL_TREES.get(repo_owner_repo_id(repo))
+    if not trees or not repo.cache.is_dir():
+        return []
+    results: list[tuple[Path, str, Path]] = []
+    for rel in trees:
+        parts = [p for p in rel.replace("\\", "/").split("/") if p]
+        src = repo.cache.joinpath(*parts)
+        if not src.is_dir():
+            continue
+        norm = "/".join(parts).lower()
+        if norm == "addons/sourcemod" or src.name.lower() == "sourcemod":
+            _append_sm_tree_files(src, results)
+            continue
+        # 默认按游戏根相对路径安装（scripts → left4dead2/scripts/...）
+        game_mapped = "/".join(parts)
+        for file in src.rglob("*"):
+            if not file.is_file() or file.name.lower() in SKIP_FILE_NAMES:
+                continue
+            results.append(
+                (file, f"game:{game_mapped}", file.relative_to(src))
+            )
+    return results
+
+
 def plan_actions(
     matched: list[tuple[RemotePlugin, list[LocalPlugin]]],
     game_dir: Path,
     update_configs: bool,
 ) -> list[FileAction]:
     actions: list[FileAction] = []
+    planned_dests: set[str] = set()
+
+    def _add(
+        src: Path,
+        mapped_root: str,
+        rel: Path,
+        hits: list[LocalPlugin],
+        plugin_label: str,
+    ) -> None:
+        dest = resolve_dest(game_dir, mapped_root, rel, hits)
+        if is_zombie_spawn_fix_manager_config(src) or is_zombie_spawn_fix_manager_config(dest):
+            return
+        try:
+            dest_key = str(dest.resolve())
+        except OSError:
+            dest_key = str(dest)
+        if dest_key in planned_dests:
+            return
+        planned_dests.add(dest_key)
+        root_name = mapped_root.split(":")[-1]
+        dest_exists = dest.is_file()
+        if dest_exists and sha256_file(src) == sha256_file(dest):
+            kind = "skip_same"
+        elif (not update_configs) and root_name in CONFIG_LIKE_ROOTS and dest_exists:
+            kind = "skip_config"
+        elif dest_exists:
+            kind = "update"
+        else:
+            kind = "new"
+        actions.append(FileAction(src=src, dest=dest, kind=kind, plugin=plugin_label))
+
+    seen_extra_repos: set[str] = set()
     for rp, hits in matched:
         for src, mapped_root, rel in iter_plugin_files(rp):
-            dest = resolve_dest(game_dir, mapped_root, rel, hits)
-            # .smx applies MemPatches; never install sourcescramble_manager duplicate
-            if is_zombie_spawn_fix_manager_config(src) or is_zombie_spawn_fix_manager_config(dest):
-                continue
-            root_name = mapped_root.split(":")[-1]
-            dest_exists = dest.is_file()
-            if dest_exists and sha256_file(src) == sha256_file(dest):
-                kind = "skip_same"
-            elif (not update_configs) and root_name in CONFIG_LIKE_ROOTS and dest_exists:
-                kind = "skip_config"
-            elif dest_exists:
-                kind = "update"
-            else:
-                kind = "new"
-            actions.append(FileAction(src=src, dest=dest, kind=kind, plugin=rp.name))
+            _add(src, mapped_root, rel, hits, rp.name)
+        rid = repo_owner_repo_id(rp.repo)
+        if rid in seen_extra_repos or rid not in REPO_EXTRA_INSTALL_TREES:
+            continue
+        seen_extra_repos.add(rid)
+        label = f"{rp.repo.name}/shared"
+        for src, mapped_root, rel in iter_repo_extra_tree_files(rp.repo):
+            _add(src, mapped_root, rel, [], label)
     return actions
 
 
@@ -2022,6 +2391,14 @@ def apply_actions(
                 _COMPILE_SEARCH_ROOTS = prev_roots
         if remove_zombie_spawn_fix_manager_config(game_dir):
             print("已跳过/移除 configs/sourcescramble/zombie_spawn_fix.txt（由插件自身打补丁）")
+    if not dry_run:
+        touched = {act.plugin for act in actions}
+        for name in touched:
+            for note in ensure_replacement_also(game_dir, name):
+                print(note)
+        for name in touched:
+            for note in retire_superseded_plugins(game_dir, name):
+                print(note)
     if not dry_run and counts["backup"]:
         print(f"已备份覆盖前的文件到: {backup_root}")
     return counts
@@ -2502,6 +2879,9 @@ def apply_plugin_source_locks(
         if core_reason:
             dropped_core[core_reason] = dropped_core.get(core_reason, 0) + 1
             continue
+        # 停更插件不参与同步/安装，改由 PLUGIN_REPLACEMENTS 指向的替代品
+        if plugin_replacement_of(rp.name, *rp.smx_names):
+            continue
         locked = remote_locked_keys(rp)
         if locked and not remote_allowed_by_source_lock(rp):
             for key in locked:
@@ -2564,13 +2944,43 @@ def load_remotes(
 
 
 def filter_by_names(plugins: list[RemotePlugin], names: list[str]) -> list[RemotePlugin]:
-    want = {n.lower() for n in names}
+    rewritten: list[str] = []
+    for n in names:
+        bundle = plugin_replacement_bundle(n)
+        if bundle:
+            rewritten.extend(bundle)
+        else:
+            rewritten.append(plugin_replacement_of(n) or n)
+    # 保序去重
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for n in rewritten:
+        key = plugin_key_norm(n)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(n)
+    rewritten = ordered
+    want = {n.lower() for n in rewritten}
+    want |= {plugin_key_norm(n) for n in rewritten}
     selected = [rp for rp in plugins if rp.keys & want or rp.name.lower() in want]
     found = set()
     for rp in selected:
         found |= rp.keys
         found.add(rp.name.lower())
-    missing = [n for n in names if n.lower() not in found]
+        found.add(plugin_key_norm(rp.name))
+    missing = [
+        n
+        for n in rewritten
+        if n.lower() not in found and plugin_key_norm(n) not in found
+    ]
+    # 替代品可能不在已配置仓库（在 Private/外站），允许稍后按 URL 安装
+    missing = [
+        n
+        for n in missing
+        if not require_install_url_for(n)
+        and plugin_key_norm(n) not in REQUIRE_INSTALL_URLS
+    ]
     if missing:
         raise SystemExit("仓库中找不到: " + ", ".join(missing))
     return selected
@@ -2610,10 +3020,39 @@ def _has_plugin(env: LocalEnv, *needles: str) -> LocalPlugin | None:
     return None
 
 
+def requirement_needs_plugin_file(req: Requirement) -> bool:
+    """明确的插件 Require 不能仅凭 .inc/.ext 判定已安装（如 l4d_heartbeat）。"""
+    candidates = {
+        dep_merge_key(req).replace(" ", "_"),
+        (req.slug or "").lower().replace("-", "_"),
+        re.sub(r"[^\w]+", "_", (req.name or "").lower()).strip("_"),
+    }
+    candidates.discard("")
+    if candidates & set(REQUIRE_INSTALL_URLS):
+        return True
+    extra_names = {name for rows in PLUGIN_EXTRA_REQUIRES.values() for name, _ in rows}
+    if candidates & extra_names:
+        return True
+    url = (req.url or "").lower()
+    return "github.com" in url and "/tree/" in url
+
+
 def check_requirement(req: Requirement, env: LocalEnv) -> CheckResult:
+    rep = plugin_replacement_of(req.name, req.slug or "", normalize_key(req.name))
+    if rep:
+        # 停更插件：以替代品是否已装为准
+        req = Requirement(
+            name=rep,
+            url=require_install_url_for(rep, env.game_dir) or req.url,
+            slug=rep,
+            note=req.note,
+        )
     key = normalize_key(req.name)
     slug = req.slug
     slug_l = slug.lower()
+    only = resolve_plugin_engine_only(env, req.name, req.slug, key, slug_l)
+    if only and only != game_engine_id(env.game_dir):
+        return CheckResult(True, f"仅 {only.upper()} Require，当前引擎不需要")
     if req.url and "alliedmods.net" in req.url.lower():
         remembered = remembered_am_ok(req.url, env)
         if remembered is not None:
@@ -2668,8 +3107,9 @@ def check_requirement(req: Requirement, env: LocalEnv) -> CheckResult:
          or CheckResult(False, "缺少 sceneprocessor")),
         ({"thirdpersonshoulder detect", "thirdpersonshoulder_detect"},
          lambda: _plugin_result(env, "ThirdPersonShoulder_Detect", "thirdpersonshoulder_detect")),
-        ({"attachments api"},
-         lambda: _plugin_result(env, "l4d_attachments_api", "attachments_api") or CheckResult(_has_inc(env, "attachments_api"), "include/attachments_api")),
+        # 运行时插件：仅有 include 不算满足（菜单9需能检出并改装）
+        ({"attachments api", "attachments_api", "l4d attachments api", "l4d_attachments_api"},
+         lambda: _plugin_result(env, "attachments_api", "l4d_attachments_api")),
         ({"weapon prop give fix"},
          lambda: _plugin_result(env, "weapon_prop_give_fix", "l4d_weapon_prop_give_fix", "l4d2_give_weapon_fix", "GiveWeaponFix")),
         ({"zombie spawn fix"},
@@ -2702,6 +3142,12 @@ def check_requirement(req: Requirement, env: LocalEnv) -> CheckResult:
          lambda: _plugin_result(env, "transition_restore_fix")),
         ({"witch prevent target loss"},
          lambda: _plugin_result(env, "witch_prevent_target_loss")),
+        # 运行时插件：仅有 scripting/include/*.inc 不算满足
+        ({"l4d heartbeat", "l4d_heartbeat"},
+         lambda: _plugin_result(env, "l4d_heartbeat")),
+        # 停更：Server_sub_101D7CB0_Detour → l4d2_chainsaw_fix
+        ({"server sub 101d7cb0 detour", "server_sub_101d7cb0_detour", "101d7cb0 detour"},
+         lambda: _plugin_result(env, "l4d2_chainsaw_fix")),
         ({"geoip", "geoip2", "country and city database"},
          lambda: CheckResult(_has_ext(env, "geoip") or (env.game_dir / "addons" / "sourcemod" / "configs" / "geoip").exists(),
                              "extensions/geoip") if (_has_ext(env, "geoip")) else CheckResult(False, "缺少 GeoIP 数据库/扩展")),
@@ -2726,6 +3172,8 @@ def check_requirement(req: Requirement, env: LocalEnv) -> CheckResult:
             ):
                 return CheckResult(False, "本地文件名来自标题而非原附件，将按原名重新下载")
             return hit
+        if requirement_needs_plugin_file(req):
+            return CheckResult(False, req.url or f"缺少插件 {slug}")
         if _has_inc(env, slug_l, slug_l.replace("-", "_")):
             return CheckResult(True, f"include/{slug}")
         if _has_ext(env, slug_l, slug_l.replace("-", "_")):
@@ -2746,6 +3194,8 @@ def check_requirement(req: Requirement, env: LocalEnv) -> CheckResult:
         ):
             return CheckResult(False, "本地文件名来自标题而非原附件，将按原名重新下载")
         return hit
+    if requirement_needs_plugin_file(req):
+        return CheckResult(False, req.url or f"缺少插件 {clean}")
     if _has_inc(env, clean):
         return CheckResult(True, f"include/{clean}")
     if _has_ext(env, clean):
@@ -2790,6 +3240,8 @@ def dep_merge_key(req: Requirement) -> str:
         ("smd_advertisements", ("smd advertisements",)),
         ("smd_dynamichostname", ("smd dynamichostname", "dynamic hostname")),
         ("cannounce", ("cannounce", "connect announce")),
+        ("command_buffer", ("command buffer", "buffer overflow fixer", "command and convar")),
+        ("attachments_api", ("attachments api", "attachments_api", "l4d attachments api")),
     )
     if key in {"action", "actions"}:
         return "actions"
@@ -2799,6 +3251,8 @@ def dep_merge_key(req: Requirement) -> str:
     url = (req.url or "").lower()
     if "actions.ext" in url or "t=336374" in url:
         return "actions"
+    if "t=325651" in url or "attachments_api" in url:
+        return "attachments_api"
     if req.url:
         return req.url.split("#")[0].rstrip("/").lower()
     return key or req.slug.lower()
@@ -2820,26 +3274,76 @@ def plugin_engine_only(sp_path: Path) -> str | None:
         text = sp_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
-    if re.search(r"only supports Left 4 Dead 1\b", text, re.I):
+    # “Left 4 Dead 1 & 2” 表示双端支持，不能当成仅 L4D1
+    if re.search(r"only supports Left 4 Dead 1\s*&\s*2\b", text, re.I):
+        return None
+    if re.search(r"only supports Left 4 Dead 1\b(?!\s*&\s*2)", text, re.I):
         return "l4d1"
     if re.search(r"only supports Left 4 Dead 2\b", text, re.I):
         return "l4d2"
-    m = re.search(
-        r"GetEngineVersion\s*\(\)[\s\S]{0,240}?"
-        r"!=\s*(Engine_Left4Dead2?)\b[\s\S]{0,240}?APLRes_SilentFailure",
-        text,
+    # != Engine_X + SilentFailure 表示“必须是 X”。左右生插件常同时判断 1/2，不能误伤。
+    rejects_l4d2 = bool(
+        re.search(
+            r"GetEngineVersion\s*\(\)[\s\S]{0,300}?"
+            r"!=\s*Engine_Left4Dead2\b[\s\S]{0,300}?APLRes_SilentFailure",
+            text,
+            re.I,
+        )
     )
-    if m:
-        return "l4d2" if m.group(1).endswith("2") else "l4d1"
+    rejects_l4d1 = bool(
+        re.search(
+            r"GetEngineVersion\s*\(\)[\s\S]{0,300}?"
+            r"!=\s*Engine_Left4Dead(?!2)\b[\s\S]{0,300}?APLRes_SilentFailure",
+            text,
+            re.I,
+        )
+    )
+    if rejects_l4d1 and rejects_l4d2:
+        return None
+    if rejects_l4d2:
+        return "l4d2"
+    if rejects_l4d1:
+        return "l4d1"
+    return None
+
+
+def _canon_plugin_key(name: str) -> str:
+    return re.sub(r"[^\w]+", "_", (name or "").lower()).strip("_")
+
+
+def known_engine_only(*names: str) -> str | None:
+    """返回已知仅支持的引擎 id（l4d1/l4d2），未知则 None。"""
+    for raw in names:
+        key = _canon_plugin_key(raw)
+        if not key:
+            continue
+        if key in ENGINE_ONLY_PLUGIN_KEYS:
+            return ENGINE_ONLY_PLUGIN_KEYS[key]
+        nk = normalize_key(raw).replace(" ", "_")
+        if nk in ENGINE_ONLY_PLUGIN_KEYS:
+            return ENGINE_ONLY_PLUGIN_KEYS[nk]
+    return None
+
+
+def resolve_plugin_engine_only(env: LocalEnv, *names: str) -> str | None:
+    known = known_engine_only(*names)
+    if known:
+        return known
+    for raw in names:
+        stem = Path((raw or "").strip()).stem
+        if not stem:
+            continue
+        sp = sm_root(env.game_dir) / "scripting" / f"{stem}.sp"
+        if sp.is_file():
+            only = plugin_engine_only(sp)
+            if only:
+                return only
     return None
 
 
 def plugin_wrong_engine(env: LocalEnv, plugin_name: str) -> bool:
-    """True if local .sp declares it will not load on this game."""
-    sp = sm_root(env.game_dir) / "scripting" / f"{plugin_name}.sp"
-    if not sp.is_file():
-        return False
-    only = plugin_engine_only(sp)
+    """True if plugin/Require 不支持当前游戏引擎。"""
+    only = resolve_plugin_engine_only(env, plugin_name)
     return bool(only and only != game_engine_id(env.game_dir))
 
 
@@ -2987,6 +3491,23 @@ def _find_chrome_exe() -> Path | None:
 
 
 def _scrub_chrome_session(user_dir: Path) -> None:
+    # 清掉上次异常退出留下的锁，否则新进程起不来调试端口
+    for name in (
+        "lockfile",
+        "LockFile",
+        "SingletonLock",
+        "SingletonCookie",
+        "SingletonSocket",
+        "RunningChromeVersion",
+    ):
+        p = user_dir / name
+        try:
+            if p.is_file() or p.is_symlink():
+                p.unlink()
+            elif p.is_dir():
+                shutil.rmtree(p, ignore_errors=True)
+        except OSError:
+            pass
     default = user_dir / "Default"
     for rel in (
         "Current Session",
@@ -3173,19 +3694,14 @@ class AlliedModsSession:
         self._cookies: list[dict] = []
         self._verified = False
 
-    def open(self) -> None:
-        if self._proc is not None and self._proc.poll() is None:
-            return
-        chrome = _find_chrome_exe()
-        if chrome is None:
-            raise RuntimeError("找不到本机 Chrome。请安装 Google Chrome 后再试。")
-        self._port = _free_debug_port()
-        user_dir = SCRIPT_DIR / ".cache" / "am_profile_real"
+    def _launch_chrome(self, chrome: Path, user_dir: Path) -> None:
         user_dir.mkdir(parents=True, exist_ok=True)
         _scrub_chrome_session(user_dir)
+        self._port = _free_debug_port()
         args = [
             str(chrome),
             f"--remote-debugging-port={self._port}",
+            "--remote-debugging-address=127.0.0.1",
             "--remote-allow-origins=*",
             f"--user-data-dir={user_dir}",
             "--no-first-run",
@@ -3196,9 +3712,16 @@ class AlliedModsSession:
         ]
         print(f"启动普通 Chrome（不自动控制页面）: {chrome}")
         self._proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        deadline = time.time() + 40
+
+    def _wait_debug_port(self, seconds: float = 40) -> None:
+        deadline = time.time() + seconds
         last_err = ""
         while time.time() < deadline:
+            if self._proc is not None and self._proc.poll() is not None:
+                raise RuntimeError(
+                    "Chrome 已退出，调试端口未启动。"
+                    "请关掉占用论坛下载配置的 Chrome 窗口后重试。"
+                )
             try:
                 info = self._debug_json("/json/version")
                 self._ua = str(info.get("User-Agent") or "")
@@ -3207,6 +3730,24 @@ class AlliedModsSession:
                 last_err = str(e)
                 time.sleep(0.25)
         raise RuntimeError(f"Chrome 调试端口未就绪: {last_err}")
+
+    def open(self) -> None:
+        if self._proc is not None and self._proc.poll() is None:
+            return
+        chrome = _find_chrome_exe()
+        if chrome is None:
+            raise RuntimeError("找不到本机 Chrome。请安装 Google Chrome 后再试。")
+        primary = SCRIPT_DIR / ".cache" / "am_profile_real"
+        try:
+            self._launch_chrome(chrome, primary)
+            self._wait_debug_port(40)
+            return
+        except Exception as first_err:
+            print(f"Chrome 调试启动失败（{first_err}），改用临时配置重试…")
+            self.close()
+            fresh = SCRIPT_DIR / ".cache" / f"am_profile_{int(time.time())}"
+            self._launch_chrome(chrome, fresh)
+            self._wait_debug_port(40)
 
     def close(self) -> None:
         proc = self._proc
@@ -3890,62 +4431,320 @@ def extract_embedded_gamedata(sp_path: Path) -> str | None:
     return blob
 
 
+def _cache_skip_dir(name: str) -> bool:
+    low = (name or "").lower()
+    return low.startswith("am_profile") or low in {
+        "am_installed.json",
+        "plugin_source_choices.json",
+    }
+
+
+def _gamedata_candidate_score(path: Path) -> tuple[int, int, int]:
+    parts = [p.lower() for p in path.parts]
+    # 优先真实 gamedata 目录，避开 sourcescramble 配置误匹配
+    under_gd = 0 if "gamedata" in parts else 1
+    under_ss = 1 if "sourcescramble" in parts else 0
+    return (under_gd, under_ss, len(path.parts))
+
+
+def _build_gamedata_cache_index() -> dict[str, list[Path]]:
+    index: dict[str, list[Path]] = {}
+    cache = SCRIPT_DIR / ".cache"
+    if not cache.is_dir():
+        return index
+    for child in cache.iterdir():
+        if not child.is_dir() or _cache_skip_dir(child.name):
+            continue
+        try:
+            for hit in child.rglob("*.txt"):
+                if not hit.is_file():
+                    continue
+                parts = [p.lower() for p in hit.parts]
+                if "gamedata" not in parts:
+                    continue
+                if "sourcescramble" in parts:
+                    continue
+                if any(_cache_skip_dir(part) for part in hit.parts):
+                    continue
+                key = hit.name.lower()
+                index.setdefault(key, []).append(hit)
+        except OSError:
+            continue
+    for key, rows in index.items():
+        rows.sort(key=_gamedata_candidate_score)
+    return index
+
+
+def gamedata_cache_index(reload: bool = False) -> dict[str, list[Path]]:
+    global _GAMEDATA_CACHE_INDEX
+    if _GAMEDATA_CACHE_INDEX is None or reload:
+        _GAMEDATA_CACHE_INDEX = _build_gamedata_cache_index()
+    return _GAMEDATA_CACHE_INDEX
+
+
+def gamedata_name_aliases(need: str) -> list[str]:
+    raw = Path(need.replace("\\", "/").strip()).name
+    base = raw[:-4] if raw.lower().endswith(".txt") else raw
+    aliases = [base]
+    if "-" in base:
+        aliases.append(base.replace("-", "_"))
+    if "_" in base:
+        aliases.append(base.replace("_", "-"))
+    if not base.lower().endswith(".games"):
+        aliases.append(f"{base}.games")
+        if "-" in base:
+            aliases.append(f"{base.replace('-', '_')}.games")
+        if "_" in base:
+            aliases.append(f"{base.replace('_', '-')}.games")
+    out: list[str] = []
+    for a in aliases:
+        out.append(a if a.lower().endswith(".txt") else f"{a}.txt")
+    return list(dict.fromkeys(out))
+
+
 def locate_cached_gamedata(need: str, extra_roots: list[Path] | None = None) -> Path | None:
     fname = Path(need.replace("\\", "/").strip()).name
     if not fname.lower().endswith(".txt"):
         fname += ".txt"
-    roots: list[Path] = []
-    for p in list(extra_roots or []) + list(_COMPILE_SEARCH_ROOTS):
-        if p and Path(p).exists():
-            roots.append(Path(p))
-    deps = SCRIPT_DIR / ".cache" / "deps"
-    cache = SCRIPT_DIR / ".cache"
-    if deps.is_dir():
-        roots.append(deps)
-        for child in deps.iterdir():
-            if child.is_dir():
-                roots.extend((child / "gamedata", child / "addons" / "sourcemod" / "gamedata"))
-    if cache.is_dir():
-        roots.append(cache)
-    checked: set[str] = set()
     candidates: list[Path] = []
-    for root in roots:
+
+    def add_if_valid(cand: Path) -> None:
+        if not cand.is_file():
+            return
+        try:
+            if looks_like_gamedata(cand.read_bytes()):
+                candidates.append(cand)
+        except OSError:
+            return
+
+    for p in list(extra_roots or []) + list(_COMPILE_SEARCH_ROOTS):
+        root = Path(p)
         if not root.exists():
             continue
-        key = str(root)
-        if key in checked:
-            continue
-        checked.add(key)
         if root.is_file():
             if root.name.lower() == fname.lower():
-                candidates.append(root)
-            continue
-        if not root.is_dir():
+                add_if_valid(root)
             continue
         for cand in (
             root / fname,
             root / "gamedata" / fname,
             root / "addons" / "sourcemod" / "gamedata" / fname,
         ):
+            add_if_valid(cand)
+
+    for cand in gamedata_cache_index().get(fname.lower(), []):
+        add_if_valid(cand)
+
+    if not candidates:
+        return None
+    candidates.sort(key=_gamedata_candidate_score)
+    return candidates[0]
+
+
+def support_paths_from_sp(sp_path: Path) -> set[str]:
+    try:
+        text = sp_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    out: set[str] = set()
+    for m in SM_SUPPORT_PATH_RE.finditer(text):
+        rel = m.group(1).replace("\\", "/").lstrip("/")
+        if rel.lower().startswith(("data/", "configs/")):
+            out.add(rel)
+    return out
+
+
+def locate_cached_support_file(rel: str, extra_roots: list[Path] | None = None) -> Path | None:
+    rel = rel.replace("\\", "/").lstrip("/")
+    fname = Path(rel).name
+    if not fname:
+        return None
+    roots: list[Path] = []
+    for p in list(extra_roots or []) + list(_COMPILE_SEARCH_ROOTS):
+        if p and Path(p).exists():
+            roots.append(Path(p))
+    cache = SCRIPT_DIR / ".cache"
+    if cache.is_dir():
+        for child in cache.iterdir():
+            if child.is_dir() and not _cache_skip_dir(child.name):
+                roots.append(child)
+    checked: set[str] = set()
+    candidates: list[Path] = []
+    for root in roots:
+        if not root.exists() or not root.is_dir():
+            continue
+        key = str(root.resolve())
+        if key in checked:
+            continue
+        checked.add(key)
+        direct = root.joinpath(*rel.split("/"))
+        if direct.is_file():
+            candidates.append(direct)
+            continue
+        for prefix in (
+            Path("addons") / "sourcemod",
+            Path("left4dead2") / "addons" / "sourcemod",
+            Path(),
+        ):
+            cand = root / prefix / Path(*rel.split("/"))
             if cand.is_file():
                 candidates.append(cand)
-    for cand in candidates:
         try:
-            if looks_like_gamedata(cand.read_bytes()):
-                return cand
+            for hit in root.rglob(fname):
+                if not hit.is_file():
+                    continue
+                hit_parts = "/".join(hit.parts).replace("\\", "/").lower()
+                want = rel.lower()
+                if hit_parts.endswith("/" + want) or hit_parts.endswith(want):
+                    candidates.append(hit)
         except OSError:
-            continue
-    search = deps if deps.is_dir() else None
-    if search is not None:
-        for hit in search.rglob(fname):
-            if not hit.is_file():
+            pass
+    if not candidates:
+        return None
+    # 优先路径层级更短、且位于 data/configs 下的
+    def score(p: Path) -> tuple[int, int]:
+        parts = [x.lower() for x in p.parts]
+        ok = 0 if ("data" in parts or "configs" in parts) else 1
+        return (ok, len(parts))
+
+    candidates.sort(key=score)
+    return candidates[0]
+
+
+def iter_cached_plugin_asset_dirs(stem: str) -> list[Path]:
+    """按插件名在缓存仓库里找同名目录（用于无 .sp 时整包补 gamedata/data）。"""
+    stem_l = stem.lower().replace("-", "_")
+    if not stem_l or stem_l in STOCK_SM_STEMS or stem_l in HELPER_SM_STEMS:
+        return []
+    found: list[Path] = []
+    seen: set[str] = set()
+
+    def add_root(root: Path) -> None:
+        if not root.is_dir():
+            return
+        try:
+            key = str(root.resolve())
+        except OSError:
+            key = str(root)
+        if key in seen:
+            return
+        if not any(
+            (root / sub).is_dir()
+            for sub in ("gamedata", "data", "configs", "scripting", "plugins")
+        ):
+            alt = root / "addons" / "sourcemod"
+            if alt.is_dir():
+                add_root(alt)
+            return
+        seen.add(key)
+        found.append(root)
+
+    cache = SCRIPT_DIR / ".cache"
+    if cache.is_dir():
+        for child in cache.iterdir():
+            if not child.is_dir() or _cache_skip_dir(child.name):
                 continue
+            for cand_name in (stem, stem.replace("-", "_"), stem.replace("_", "-")):
+                direct = child / cand_name
+                if direct.is_dir():
+                    add_root(direct)
+            # L4D1_2-Plugins 等一级插件目录
             try:
-                if looks_like_gamedata(hit.read_bytes()):
-                    return hit
+                for sub in child.iterdir():
+                    if not sub.is_dir():
+                        continue
+                    name_l = sub.name.lower().replace("-", "_")
+                    if name_l == stem_l or stem_l in name_l:
+                        add_root(sub)
             except OSError:
+                pass
+
+    # 从 gamedata 索引反推插件根目录；不要把整个 addons/sourcemod 当成插件包
+    for rows in gamedata_cache_index().values():
+        for p in rows:
+            parts = list(p.parts)
+            low = [x.lower().replace("-", "_") for x in parts]
+            if stem_l not in low and not any(stem_l == x or x.startswith(stem_l + "_") for x in low):
                 continue
-    return None
+            if "gamedata" not in low:
+                continue
+            i = len(low) - 1 - low[::-1].index("gamedata")
+            if i <= 0:
+                continue
+            root = Path(*parts[:i])
+            if root.name.lower() in {"sourcemod", "addons", "left4dead2", "left4dead"}:
+                continue
+            add_root(root)
+    return found
+
+
+def copy_cached_plugin_sidecars(game_dir: Path, stem: str) -> list[Path]:
+    """无源码时，把缓存同名插件目录下的 gamedata/data/configs 一并拷入。"""
+    extra: list[Path] = []
+    sm = sm_root(game_dir)
+    for root in iter_cached_plugin_asset_dirs(stem):
+        for kind, dest_root in (
+            ("gamedata", sm / "gamedata"),
+            ("data", sm / "data"),
+            ("configs", sm / "configs"),
+        ):
+            src_dir = root / kind
+            if not src_dir.is_dir():
+                # 兼容 addons/sourcemod/...
+                alt = root / "addons" / "sourcemod" / kind
+                src_dir = alt if alt.is_dir() else src_dir
+            if not src_dir.is_dir():
+                continue
+            for file in src_dir.rglob("*"):
+                if not file.is_file() or file.name.lower() in SKIP_FILE_NAMES:
+                    continue
+                if kind == "gamedata" and not looks_like_gamedata(file.read_bytes()):
+                    continue
+                if kind == "configs" and is_zombie_spawn_fix_manager_config(file):
+                    continue
+                dest = dest_root / file.relative_to(src_dir)
+                if dest.is_file():
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(file, dest)
+                print(f"   已补全资源: {dest.relative_to(sm)}")
+                extra.append(dest)
+    return extra
+
+
+def ensure_data_for_copied(game_dir: Path, copied: list[Path]) -> list[Path]:
+    extra: list[Path] = []
+    sm = sm_root(game_dir)
+    rels: set[str] = set()
+    smx_stems: set[str] = set()
+    for p in copied:
+        if not p:
+            continue
+        if p.suffix.lower() == ".sp" and p.is_file():
+            rels |= support_paths_from_sp(p)
+        elif p.suffix.lower() == ".smx":
+            smx_stems.add(p.stem)
+            sp = sm / "scripting" / f"{p.stem}.sp"
+            if sp.is_file():
+                rels |= support_paths_from_sp(sp)
+    for rel in sorted(rels):
+        dest = sm / Path(*rel.split("/"))
+        if dest.is_file():
+            continue
+        found = locate_cached_support_file(rel)
+        if found is None:
+            print(f"   缺少资源: {rel}")
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(found, dest)
+        print(f"   已补全资源: {rel}")
+        extra.append(dest)
+    for stem in sorted(smx_stems):
+        sp = sm / "scripting" / f"{stem}.sp"
+        if sp.is_file():
+            continue
+        extra.extend(copy_cached_plugin_sidecars(game_dir, stem))
+    return extra
 
 
 def ensure_gamedata_for_copied(game_dir: Path, copied: list[Path]) -> list[Path]:
@@ -3954,28 +4753,33 @@ def ensure_gamedata_for_copied(game_dir: Path, copied: list[Path]) -> list[Path]
     gd_dir = sm / "gamedata"
     gd_dir.mkdir(parents=True, exist_ok=True)
     names: set[str] = set()
-    stems: set[str] = set()
     for p in copied:
         if not p:
             continue
         suffix = p.suffix.lower()
         if suffix == ".sp" and p.is_file():
             names |= gamedata_names_from_sp(p)
-            stems.add(p.stem)
         elif suffix == ".smx":
-            stems.add(p.stem)
-            sp = sm / "scripting" / f"{p.stem}.sp"
+            stem = p.stem
+            if stem.lower() in STOCK_SM_STEMS or stem.lower() in HELPER_SM_STEMS:
+                continue
+            sp = sm / "scripting" / f"{stem}.sp"
             if sp.is_file():
                 names |= gamedata_names_from_sp(sp)
+            else:
+                # 无源码时按插件名查找；-/_ 变体只用于缓存匹配，不改目标文件名
+                names.add(stem)
         elif suffix == ".txt" and "gamedata" in [x.lower() for x in p.parts]:
             continue
-    required = set(names)
-    optional = set(stems) - required
-    for name in sorted(required | optional):
+    for name in sorted(names):
         dest = gd_dir / (name if name.lower().endswith(".txt") else f"{name}.txt")
         if dest.is_file():
             continue
-        found = locate_cached_gamedata(name)
+        found: Path | None = None
+        for alias in gamedata_name_aliases(name):
+            found = locate_cached_gamedata(alias)
+            if found is not None:
+                break
         embedded: str | None = None
         if found is None:
             for p in copied:
@@ -3984,20 +4788,45 @@ def ensure_gamedata_for_copied(game_dir: Path, copied: list[Path]) -> list[Path]
                     if embedded:
                         break
             if embedded is None:
-                sp_local = sm / "scripting" / f"{Path(name).stem}.sp"
-                if sp_local.is_file():
-                    embedded = extract_embedded_gamedata(sp_local)
+                base = name[: -len(".games")] if name.lower().endswith(".games") else Path(name).stem
+                for cand_stem in (Path(name).stem, base, base.replace("-", "_"), base.replace("_", "-")):
+                    sp_local = sm / "scripting" / f"{cand_stem}.sp"
+                    if sp_local.is_file():
+                        embedded = extract_embedded_gamedata(sp_local)
+                        if embedded:
+                            break
+        fetched: bytes | None = None
         if found is None and not embedded:
-            if name in required:
-                print(f"   缺少 gamedata: {dest.name}")
+            fetch_url = (
+                GAMEDATA_FETCH_URLS.get(dest.name.lower())
+                or GAMEDATA_FETCH_URLS.get(Path(name).stem.lower())
+                or GAMEDATA_FETCH_URLS.get(name.lower())
+            )
+            if fetch_url:
+                try:
+                    print(f"   下载 gamedata: {dest.name}")
+                    if "alliedmods.net" in fetch_url.lower() or "sourcemod.net" in fetch_url.lower():
+                        fetched = get_am_session().fetch(fetch_url)
+                    else:
+                        fetched = http_bytes(fetch_url)
+                    if not fetched or is_cloudflare_challenge(fetched) or not looks_like_gamedata(fetched):
+                        fetched = None
+                except Exception as e:
+                    print(f"   下载 gamedata 失败 {dest.name}: {e}")
+                    fetched = None
+        if found is None and not embedded and not fetched:
+            print(f"   缺少 gamedata: {dest.name}")
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         if found is not None:
             shutil.copy2(found, dest)
+        elif fetched is not None:
+            write_bytes(dest, fetched)
         else:
             dest.write_text(embedded or "", encoding="utf-8")
         print(f"   已补全 gamedata: {dest.relative_to(sm)}")
         extra.append(dest)
+    extra.extend(ensure_data_for_copied(game_dir, copied))
     return extra
 
 
@@ -4380,9 +5209,9 @@ def am_url_ids(url: str) -> set[str]:
     return ids
 
 
-def forced_am_sp_url(name: str = "", slug: str = "", url: str = "") -> str:
+def is_command_buffer_target(name: str = "", slug: str = "", url: str = "") -> bool:
     blob = re.sub(r"[^\w.]+", "_", " ".join([name or "", slug or "", url or ""]).lower())
-    if any(
+    return any(
         x in blob
         for x in (
             "309656",
@@ -4390,9 +5219,14 @@ def forced_am_sp_url(name: str = "", slug: str = "", url: str = "") -> str:
             "command_buffer",
             "buffer_overflow_fixer",
             "command_and_convar",
+            "silvdev_command_buffer",
         )
-    ):
-        return COMMAND_BUFFER_SP_URL
+    )
+
+
+def forced_am_sp_url(name: str = "", slug: str = "", url: str = "") -> str:
+    # command_buffer 改走 SilvDev GitHub，不再强制 AlliedMods 附件
+    blob = re.sub(r"[^\w.]+", "_", " ".join([name or "", slug or "", url or ""]).lower())
     if any(x in blob for x in ("336298", "193611", "l4d2_ladder_patch", "ladder_server_crash")):
         return LADDER_PATCH_SP_URL
     if any(x in blob for x in ("328327", "188755", "remove_item_collision", "carryables_collision")) or (
@@ -4496,11 +5330,74 @@ def fetch_am_plugin_source(am: AlliedModsSession, file_id: str) -> bytes:
     raise RuntimeError(f"未能下载论坛源码 file_id={file_id}{extra}")
 
 
+def install_command_buffer(game_dir: Path) -> str:
+    return install_from_github_url(COMMAND_BUFFER_URL, game_dir, hint="command_buffer")
+
+
+def install_l4d2_vomit_fix(game_dir: Path) -> str:
+    """lakwsh/l4d2_vomit_fix：vomit_fix + a2s_fix（插件与 gamedata）。"""
+    return install_from_github_url(L4D2_VOMIT_FIX_URL, game_dir, hint="l4d2_vomit_fix")
+
+
+def install_l4d2_chainsaw_fix(game_dir: Path) -> str:
+    """替代已停更的 Server_sub_101D7CB0_Detour。"""
+    msg = install_from_github_url(
+        L4D2_CHAINSAW_FIX_URL, game_dir, hint="l4d2_chainsaw_fix"
+    )
+    notes = retire_superseded_plugins(game_dir, "l4d2_chainsaw_fix")
+    if notes:
+        return msg + "；" + "；".join(notes)
+    return msg
+
+
+def install_attachments_api(game_dir: Path) -> str:
+    """SilvDev/Attachments_API（不再走 AlliedMods 论坛附件）。"""
+    return install_from_github_url(
+        ATTACHMENTS_API_URL, game_dir, hint="attachments_api"
+    )
+
+
+def install_l4d_pipebomb_ignore(game_dir: Path) -> str:
+    """Silvers Bots Ignore PipeBombs：论坛附件 smx + gamedata。"""
+    sm = sm_root(game_dir)
+    am = get_am_session()
+    copied: list[str] = []
+    # gamedata
+    gd_dest = sm / "gamedata" / "l4d_pipebomb_ignore.txt"
+    if not gd_dest.is_file():
+        blob = am.fetch(PIPEBOMB_IGNORE_GD_URL)
+        if not blob or is_cloudflare_challenge(blob) or not looks_like_gamedata(blob):
+            raise RuntimeError("未能下载 l4d_pipebomb_ignore.txt gamedata")
+        write_bytes(gd_dest, blob)
+        copied.append(gd_dest.name)
+    # plugin smx（论坛已编译，勿点 Get Plugin）
+    smx_dest = sm / "plugins" / "l4d_pipebomb_ignore.smx"
+    if not smx_dest.is_file():
+        blob = am.fetch(PIPEBOMB_IGNORE_SMX_URL)
+        if not blob or is_cloudflare_challenge(blob) or not looks_like_smx(blob):
+            # 回退整帖解析
+            return install_from_alliedmods(
+                Requirement(
+                    name="l4d_pipebomb_ignore",
+                    url=PIPEBOMB_IGNORE_URL,
+                    slug="l4d_pipebomb_ignore",
+                ),
+                game_dir,
+            )
+        write_bytes(smx_dest, blob)
+        copied.append(smx_dest.name)
+    if not copied:
+        return "已存在 l4d_pipebomb_ignore（插件与 gamedata）"
+    return f"已安装 l4d_pipebomb_ignore（{', '.join(copied)}）"
+
+
 def install_from_alliedmods(req: Requirement, game_dir: Path) -> str:
     sm = sm_root(game_dir)
     installed: list[str] = []
     if dep_merge_key(req) == "zombie_spawn_fix" or "333351" in (req.url or ""):
         return install_zombie_spawn_fix(game_dir)
+    if is_command_buffer_target(req.name, req.slug or "", req.url or ""):
+        return install_command_buffer(game_dir)
     spec = am_source_sp_spec(req.url, req.name, req.slug)
     if spec:
         return install_am_direct_sp(spec, game_dir, req.url)
@@ -4776,6 +5673,22 @@ def compile_copied_scripts(
     return extra
 
 
+def copy_game_rel_tree(src: Path, game_dir: Path, dest_rel: str) -> list[Path]:
+    """把 src 目录复制到 game_dir/dest_rel（如 scripts → left4dead2/scripts）。"""
+    if not src.is_dir():
+        return []
+    copied: list[Path] = []
+    base = game_dir.joinpath(*[p for p in dest_rel.replace("\\", "/").split("/") if p])
+    for file in src.rglob("*"):
+        if not file.is_file() or file.name.lower() in SKIP_FILE_NAMES:
+            continue
+        dest = base / file.relative_to(src)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(file, dest)
+        copied.append(dest)
+    return copied
+
+
 def install_plugin_tree(src: Path, game_dir: Path, hint: str = "") -> str:
     sm = sm_root(game_dir)
     copied = copy_sm_tree(src, game_dir)
@@ -4788,6 +5701,10 @@ def install_plugin_tree(src: Path, game_dir: Path, hint: str = "") -> str:
             if cand.is_dir() and cand.name.lower() == "sourcemod" and (cand / "plugins").is_dir():
                 copied = copy_sm_tree(cand, game_dir)
                 break
+    # NekoSpecials 等：仓库根 scripts/vscripts → 游戏 scripts/vscripts
+    scripts = src / "scripts"
+    if scripts.is_dir():
+        copied.extend(copy_game_rel_tree(scripts, game_dir, "scripts"))
     if src.is_dir():
         for file in src.iterdir():
             if not file.is_file() or file.name.lower() in SKIP_FILE_NAMES:
@@ -4822,36 +5739,36 @@ def install_blob_bytes(game_dir: Path, filename: str, data: bytes) -> Path:
 
 
 def try_fetch_sibling_gamedata(owner: str, repo: str, branch: str, file_parts: list[str], game_dir: Path) -> Path | None:
-    if not file_parts:
+    if not file_parts or not file_parts[-1].lower().endswith(".sp"):
         return None
-    parts = list(file_parts)
-    if parts[-1].lower().endswith(".sp"):
-        parts[-1] = Path(parts[-1]).stem + ".txt"
-    else:
-        return None
-    if "scripting" in [p.lower() for p in parts]:
-        i = [p.lower() for p in parts].index("scripting")
-        parts[i] = "gamedata"
-    else:
-        parts = parts[:-1] + ["gamedata", parts[-1]]
-        if len(file_parts) >= 2:
-            parts = file_parts[:-1] + [Path(file_parts[-1]).stem + ".txt"]
-    rel = "/".join(parts)
-    try:
-        blob = github_file_bytes(owner, repo, rel, branch)
-    except Exception:
-        alt = "/".join(file_parts[:-1] + [Path(file_parts[-1]).stem + ".txt"])
-        if alt == rel:
-            return None
+    stem = Path(file_parts[-1]).stem
+    name_candidates = [f"{stem}.txt", f"{stem}.games.txt"]
+    path_candidates: list[str] = []
+    low_parts = [p.lower() for p in file_parts]
+    for gd_name in name_candidates:
+        if "scripting" in low_parts:
+            i = low_parts.index("scripting")
+            parts = list(file_parts)
+            parts[i] = "gamedata"
+            parts[-1] = gd_name
+            path_candidates.append("/".join(parts))
+        path_candidates.append("/".join(file_parts[:-1] + ["gamedata", gd_name]))
+        path_candidates.append("/".join(file_parts[:-1] + [gd_name]))
+    seen: set[str] = set()
+    for rel in path_candidates:
+        if rel in seen:
+            continue
+        seen.add(rel)
         try:
-            blob = github_file_bytes(owner, repo, alt, branch)
+            blob = github_file_bytes(owner, repo, rel, branch)
         except Exception:
-            return None
-    if not looks_like_gamedata(blob) and not file_parts[-1].lower().endswith(".sp"):
-        return None
-    dest = sm_root(game_dir) / "gamedata" / Path(rel).name
-    write_bytes(dest, blob)
-    return dest
+            continue
+        if not looks_like_gamedata(blob):
+            continue
+        dest = sm_root(game_dir) / "gamedata" / Path(rel).name
+        write_bytes(dest, blob)
+        return dest
+    return None
 
 
 def unpack_plugin_archive(blob: bytes, game_dir: Path, filename: str = "") -> list[Path]:
@@ -4946,6 +5863,11 @@ def install_from_github_url(url: str, game_dir: Path, hint: str = "") -> str:
         return f"已安装 {hint or dest.name}（{len(copied)} 个文件）"
     local = cache_git_repo(f"{owner}/{repo}", branch if branch else "")
     sub = local.joinpath(*rest) if rest else local
+    # 缓存未过期时可能缺较新子目录（如 Require: l4d_heartbeat），强制刷新后再找
+    if rest and not sub.exists():
+        print(f"缓存缺少路径 {'/'.join(rest)}，强制更新: {owner}/{repo}")
+        local = cache_git_repo(f"{owner}/{repo}", branch if branch else "", force=True)
+        sub = local.joinpath(*rest) if rest else local
     if not sub.exists():
         raise RuntimeError(f"缓存中找不到路径: {sub}")
     global _COMPILE_SEARCH_ROOTS
@@ -5016,6 +5938,14 @@ INSTALLERS = {
     "witch_prevent_target_loss": install_witch_prevent_target_loss,
     "l4d2_resolve_collision_fix": install_resolve_collision_fix,
     "sceneprocessor": install_sceneprocessor,
+    "command_buffer": install_command_buffer,
+    "attachments_api": install_attachments_api,
+    "l4d_attachments_api": install_attachments_api,
+    "l4d_pipebomb_ignore": install_l4d_pipebomb_ignore,
+    "l4d2_vomit_fix": install_l4d2_vomit_fix,
+    "l4d2_a2s_fix": install_l4d2_vomit_fix,
+    "l4d2_chainsaw_fix": install_l4d2_chainsaw_fix,
+    "server_sub_101d7cb0_detour": install_l4d2_chainsaw_fix,
 }
 
 
@@ -5035,7 +5965,74 @@ def install_extra_requires_for(plugin_name: str, env: LocalEnv, dry_run: bool) -
     return msgs
 
 
+def collect_missing_for_plugins(
+    plugins: list[RemotePlugin],
+    env: LocalEnv,
+    local_names: set[str] | None = None,
+) -> list[dict]:
+    """收集即将安装/更新插件的缺失 Require（含尚未装上的插件的 EXTRA）。"""
+    groups = {
+        item["key"]: item
+        for item in collect_missing(plugins, env, local_names=local_names)
+    }
+    for rp in plugins:
+        keys = set(rp.keys) | {
+            rp.name.lower(),
+            normalize_key(rp.name).replace(" ", "_"),
+        }
+        for key in keys:
+            canon = key.lower().replace("-", "_")
+            for name, url in PLUGIN_EXTRA_REQUIRES.get(canon, []):
+                req = Requirement(name=name, url=url, slug=name)
+                result = check_requirement(req, env)
+                if result.ok:
+                    continue
+                mk = dep_merge_key(req)
+                item = groups.setdefault(
+                    mk,
+                    {
+                        "key": mk,
+                        "req": req,
+                        "needed_by": [],
+                        "result": result,
+                    },
+                )
+                label = f"{rp.repo.key}/{rp.name}"
+                if label not in item["needed_by"]:
+                    item["needed_by"].append(label)
+    return list(groups.values())
+
+
+def ensure_requires_before_install(
+    plugins: list[RemotePlugin],
+    env: LocalEnv,
+    *,
+    dry_run: bool = False,
+    fetch: bool = True,
+    quiet_ok: bool = False,
+) -> LocalEnv:
+    """所有插件安装/更新前：先检测并安装缺失 Require。"""
+    if not plugins or not fetch:
+        return env
+    local_names = {k for rp in plugins for k in rp.keys}
+    local_names |= {rp.name.lower() for rp in plugins}
+    groups = collect_missing_for_plugins(plugins, env, local_names=local_names)
+    if not groups:
+        if not quiet_ok:
+            print("Require: 依赖已满足，继续安装插件")
+        return env
+    print()
+    print(f"=== 先安装 Require（缺 {len(groups)} 项）===")
+    for item in groups:
+        needed = ", ".join(item["needed_by"][:4])
+        more = f" 等{len(item['needed_by'])}个" if len(item["needed_by"]) > 4 else ""
+        print(f"  [缺] {item['req'].name}  <- {needed}{more}")
+    fetch_missing_deps(groups, env, dry_run)
+    return scan_local_env(env.game_dir)
+
+
 def with_plugin_extras(names: list[str], env: LocalEnv, dry_run: bool, msg: str) -> str:
+    # 额外 Require 应在安装插件前处理；此处仅作兜底（已装则跳过）
     notes: list[str] = []
     seen: set[str] = set()
     for raw in names:
@@ -5045,25 +6042,115 @@ def with_plugin_extras(names: list[str], env: LocalEnv, dry_run: bool, msg: str)
         seen.add(key)
         notes.extend(install_extra_requires_for(key, env, dry_run))
     if notes:
-        return msg + "；同时安装 Require: " + "；".join(notes)
+        return msg + "；Require: " + "；".join(notes)
     return msg
 
 
+def remote_for_require_prep(
+    name: str,
+    *,
+    slug: str = "",
+    url: str = "",
+    known: dict[str, RemotePlugin] | None = None,
+    repo: RepoSpec | None = None,
+) -> RemotePlugin:
+    """构造用于预装 Require 的 RemotePlugin（尽量带上仓库 Require 列表）。"""
+    keys = {
+        (name or "").lower(),
+        (slug or "").lower().replace("-", "_"),
+        normalize_key(name or slug).replace(" ", "_"),
+    }
+    keys = {k for k in keys if k}
+    rp: RemotePlugin | None = None
+    if known:
+        for k in keys:
+            if k in known:
+                rp = known[k]
+                break
+    if rp is None:
+        rp = RemotePlugin(
+            name=slug or name or "plugin",
+            path=Path("."),
+            repo=repo or CATALOG_REPO,
+            smx_names=[slug or name],
+            requires=[],
+        )
+    requires = augment_plugin_requires(rp.name, list(rp.requires), rp.repo)
+    for k in keys:
+        requires = augment_plugin_requires(k, requires, rp.repo)
+    return RemotePlugin(
+        name=rp.name,
+        path=rp.path,
+        repo=rp.repo,
+        smx_names=rp.smx_names or [slug or name],
+        requires=requires,
+    )
+
+
 def resolve_official_core_key(key: str, *names: str) -> str | None:
-    """SourceMod/MetaMod 只认官方包，返回 sourcemod / metamod 或 None。"""
-    blob = " ".join([key, *[n or "" for n in names]]).lower()
-    blob = blob.replace("-", "_").replace(" ", "_").replace(":", "")
-    if any(tok in blob for tok in ("metamod", "mmsource", "metamodsource")):
+    """SourceMod/MetaMod 只认官方包，返回 sourcemod / metamod 或 None。
+
+    只按名称/末段标识判断，避免 GitHub 路径里的 addons/sourcemod/...
+    （例如 TickrateFixes.sp）被误当成要装官方 SourceMod。
+    """
+    tokens: set[str] = set()
+    for raw in (key, *names):
+        text = (raw or "").strip()
+        if not text:
+            continue
+        if "://" in text or "/" in text or "\\" in text:
+            path = urlparse(text).path if "://" in text else text
+            text = Path(path).stem
+        norm = text.lower().replace("-", "_").replace(" ", "_").replace(":", "")
+        tokens.add(norm)
+        tokens.update(t for t in re.split(r"[^\w]+", norm) if t)
+    if tokens & {"metamod", "mmsource", "metamodsource"}:
         return "metamod"
-    if "sourcemod" in blob:
+    if "sourcemod" in tokens:
         return "sourcemod"
     return None
 
 
-def try_install_requirement(req: Requirement, env: LocalEnv, dry_run: bool) -> str:
+def try_install_requirement(
+    req: Requirement,
+    env: LocalEnv,
+    dry_run: bool,
+    *,
+    _skip_also: bool = False,
+) -> str:
+    old_key = discontinued_plugin_key(req.name, req.slug or "", dep_merge_key(req))
+    rep = plugin_replacement_of(req.name, req.slug or "", dep_merge_key(req))
+    if rep:
+        req = Requirement(
+            name=rep,
+            url=require_install_url_for(rep, env.game_dir) or req.url,
+            slug=rep,
+            note=req.note,
+        )
+
+    def finish(msg: str) -> str:
+        if dry_run or _skip_also or msg.startswith(("跳过:", "预览:")):
+            return msg
+        target = rep or req.name
+        notes: list[str] = []
+        if old_key or plugin_key_norm(target) in set(PLUGIN_REPLACEMENTS.values()):
+            notes.extend(ensure_replacement_also(env.game_dir, old_key or target))
+            notes.extend(retire_superseded_plugins(env.game_dir, target))
+        if notes:
+            return msg + "；" + "；".join(notes)
+        return msg
+
     key = dep_merge_key(req)
+    slug_key = plugin_key_norm(req.slug or req.name or key)
     url = (req.url or "").lower()
     extra_names = [key, req.slug or "", req.name]
+    only = resolve_plugin_engine_only(env, key, req.slug or "", req.name)
+    if only and only != game_engine_id(env.game_dir):
+        stem = Path((req.slug or req.name or key).strip()).stem
+        if stem and not dry_run:
+            disable_wrong_engine_plugin(env, stem)
+        eng = game_engine_id(env.game_dir).upper()
+        return f"跳过: {req.name or key} 是 {only.upper()} Require，当前 {eng} 不安装"
     core = resolve_official_core_key(key, req.slug or "", req.name)
     if core:
         if dry_run:
@@ -5072,26 +6159,54 @@ def try_install_requirement(req: Requirement, env: LocalEnv, dry_run: bool) -> s
             msg = install_env_sourcemod(env.game_dir, pick_version=False)
         else:
             msg = install_env_metamod(env.game_dir, pick_version=False)
-        return with_plugin_extras(extra_names, env, dry_run, msg)
-    env_fn = lookup_plugin_installer(key)
+        return finish(with_plugin_extras(extra_names, env, dry_run, msg))
+    env_fn = lookup_plugin_installer(key) or lookup_plugin_installer(slug_key)
     if env_fn:
         if dry_run:
             return f"预览: 将安装依赖 {key}"
-        return with_plugin_extras(extra_names, env, dry_run, env_fn(env.game_dir))
-    install_url = REQUIRE_INSTALL_URLS.get(key)
-    if install_url:
+        return finish(with_plugin_extras(extra_names, env, dry_run, env_fn(env.game_dir)))
+    install_url = (
+        REQUIRE_INSTALL_URLS.get(key)
+        or REQUIRE_INSTALL_URLS.get(slug_key)
+        or require_install_url_for(slug_key, env.game_dir)
+        or (req.url or "")
+    )
+    if install_url and (
+        "github.com" in install_url.lower()
+        or "raw.githubusercontent.com" in install_url.lower()
+        or "alliedmods.net" in install_url.lower()
+        or slug_key in REQUIRE_INSTALL_URLS
+        or key in REQUIRE_INSTALL_URLS
+    ):
         if dry_run:
             return f"预览: 将从 {install_url} 安装"
-        fn = INSTALLERS.get(key) or lookup_plugin_installer(key)
-        if fn:
-            return with_plugin_extras(extra_names, env, dry_run, fn(env.game_dir))
-        return with_plugin_extras(
-            extra_names,
-            env,
-            dry_run,
-            install_from_github_url(install_url, env.game_dir, hint=key),
+        fn = (
+            INSTALLERS.get(key)
+            or INSTALLERS.get(slug_key)
+            or lookup_plugin_installer(key)
+            or lookup_plugin_installer(slug_key)
         )
-    if key in {"l4dtoolz"}:
+        if fn:
+            return finish(with_plugin_extras(extra_names, env, dry_run, fn(env.game_dir)))
+        if "alliedmods.net" in install_url.lower() or "sourcemod.net" in install_url.lower():
+            am_req = Requirement(name=req.name, url=install_url, slug=req.slug or slug_key)
+            return finish(
+                with_plugin_extras(
+                    extra_names,
+                    env,
+                    dry_run,
+                    install_from_alliedmods(am_req, env.game_dir),
+                )
+            )
+        return finish(
+            with_plugin_extras(
+                extra_names,
+                env,
+                dry_run,
+                install_from_github_url(install_url, env.game_dir, hint=slug_key or key),
+            )
+        )
+    if key in {"l4dtoolz"} or slug_key == "l4dtoolz":
         return "跳过: l4dtoolz 需按教程手动安装（本地已检测到则不会出现此项）"
     if "fastdl" in key or "developer.valvesoftware.com" in url:
         return "跳过: FastDL 需按教程自行配置"
@@ -5101,25 +6216,29 @@ def try_install_requirement(req: Requirement, env: LocalEnv, dry_run: bool) -> s
         return "预览: 将尝试自动下载"
     fn = (
         INSTALLERS.get(key)
-        or INSTALLERS.get((req.slug or "").lower().replace("-", "_"))
+        or INSTALLERS.get(slug_key)
         or lookup_plugin_installer(key)
-        or lookup_plugin_installer((req.slug or "").lower().replace("-", "_"))
+        or lookup_plugin_installer(slug_key)
     )
     if fn:
-        return with_plugin_extras(extra_names, env, dry_run, fn(env.game_dir))
+        return finish(with_plugin_extras(extra_names, env, dry_run, fn(env.game_dir)))
     url = req.url or ""
     if "github.com" in url or "raw.githubusercontent.com" in url:
-        return with_plugin_extras(
-            extra_names,
-            env,
-            dry_run,
-            install_from_github_url(url, env.game_dir, hint=req.slug or req.name),
+        return finish(
+            with_plugin_extras(
+                extra_names,
+                env,
+                dry_run,
+                install_from_github_url(url, env.game_dir, hint=req.slug or req.name),
+            )
         )
     if "alliedmods.net" in url or "sourcemod.net" in url:
-        return with_plugin_extras(extra_names, env, dry_run, install_from_alliedmods(req, env.game_dir))
+        return finish(
+            with_plugin_extras(extra_names, env, dry_run, install_from_alliedmods(req, env.game_dir))
+        )
     embedded = try_write_embedded_gamedata(req, env, dry_run)
     if embedded:
-        return with_plugin_extras(extra_names, env, dry_run, embedded)
+        return finish(with_plugin_extras(extra_names, env, dry_run, embedded))
     stem = Path((req.slug or req.name or "").strip()).stem
     if stem and plugin_wrong_engine(env, stem):
         return f"跳过: {stem} 不支持当前游戏引擎，无需补 gamedata"
@@ -5217,7 +6336,18 @@ def collect_local_gamedata_gaps(
         key = p.name.lower()
         if key in have:
             continue
-        req = by_name.get(key) or Requirement(name=p.name, slug=p.name, url="")
+        url = ""
+        if key in by_name and by_name[key].url:
+            url = by_name[key].url
+        else:
+            url = (
+                require_install_url_for(p.name, env.game_dir)
+                or REQUIRE_INSTALL_URLS.get(key)
+                or ""
+            )
+        req = by_name.get(key) or Requirement(name=p.name, slug=p.name, url=url)
+        if not req.url and url:
+            req = Requirement(name=req.name, slug=req.slug or p.name, url=url, note=req.note)
         extra.append(
             {
                 "key": key,
@@ -5635,7 +6765,15 @@ def install_env_left4dhooks(game_dir: Path) -> str:
 def install_env_l4dtoolz(game_dir: Path) -> str:
     name, blob = pick_release_zip("lakwsh/l4dtoolz", ["main", "windows", "win"], deny=["2155", "linux"])
     copied = extract_game_zip(blob, game_dir)
-    return f"已更新 l4dtoolz（{name}，{len(copied)} 个文件）"
+    try:
+        patch = install_l4d2_vomit_fix(game_dir)
+    except Exception as e:
+        log_failure("l4dtoolz 后安装 l4d2_vomit_fix 失败", e, L4D2_VOMIT_FIX_URL)
+        return (
+            f"已更新 l4dtoolz（{name}，{len(copied)} 个文件）；"
+            f"配套补丁 l4d2_vomit_fix 失败: {e}"
+        )
+    return f"已更新 l4dtoolz（{name}，{len(copied)} 个文件）；{patch}"
 
 
 def install_env_multicolors(game_dir: Path) -> str:
@@ -5894,23 +7032,16 @@ def update_env(
         else:
             print("SourceMod 默认不覆盖 plugins/configs。")
     print()
-    ok_n = fail_n = skip_n = 0
+    ok_n = fail_n = 0
     done: set[str] = set()
-    skipped_missing = 0
     for key, title, present, _where in rows:
         if only is not None and key not in only:
             continue
         if present_only and not present:
-            skipped_missing += 1
-            skip_n += 1
             continue
         if (missing_only or key in skip_if_present) and present:
-            print(f"  [跳过] {title} 已安装")
-            skip_n += 1
             continue
         if key in done:
-            print(f"  [跳过] {title} 已随上一项更新")
-            skip_n += 1
             continue
         print(f"  -> {title}")
         if dry_run:
@@ -5937,15 +7068,12 @@ def update_env(
             done.add(key)
         except InstallCancelled as e:
             print(f"     {e}")
-            skip_n += 1
         except Exception as e:
             print(f"     失败: {e}")
             log_failure(f"环境更新失败: {title}", e)
             fail_n += 1
-    if present_only and skipped_missing:
-        print(f"  （已跳过 {skipped_missing} 项未安装依赖，不自动补全）")
     print()
-    print(f"环境更新完成: 成功 {ok_n}, 失败 {fail_n}, 跳过 {skip_n}")
+    print(f"环境更新完成: 成功 {ok_n}, 失败 {fail_n}")
     if fail_n:
         print(f"失败已写入: {LOG_FILE}")
     print()
@@ -6115,8 +7243,38 @@ CUSTOM_PLUGIN_KEYS = {
 }
 
 CATALOG_URL_OVERRIDES = {
-    "command_and_convar_buffer_overflow_fixer": COMMAND_BUFFER_SP_URL,
-    "command_buffer": COMMAND_BUFFER_SP_URL,
+    "attachments_api": ATTACHMENTS_API_URL,
+    "l4d_attachments_api": ATTACHMENTS_API_URL,
+    "l4d_pipebomb_ignore": PIPEBOMB_IGNORE_URL,
+    "server_sub_101d7cb0_detour": L4D2_CHAINSAW_FIX_URL,
+    "l4d2_chainsaw_fix": L4D2_CHAINSAW_FIX_URL,
+    "hunter_growl_sound_fix": VOICE_MECHANICS_FIX_URL_L4D2,
+    "l4d2_voice_mechanics_fix": VOICE_MECHANICS_FIX_URL_L4D2,
+    "l4d2_ai_damagefix": CHARGING_TAKEDAMAGE_PATCH_URL,
+    "charging_takedamage_patch": CHARGING_TAKEDAMAGE_PATCH_URL,
+    "l4d_ai_hunter_skeet_dmg_fix": AI_HUNTER_SKEET_DMG_FIX_URL,
+    "l4d2_block_rocketjump": L4D_FIX_ROCKET_JUMP_URL,
+    "l4d_fix_rocket_jump": L4D_FIX_ROCKET_JUMP_URL,
+    "l4d2_transition_forward": L4D_TRANSITION_ENTITY_URL,
+    "l4d_transition_entity": L4D_TRANSITION_ENTITY_URL,
+    "l4d2pause": L4D_PAUSE_URL,
+    "l4d_pause": L4D_PAUSE_URL,
+    "l4d_limited_ammo_pile": L4D_PERCENTAGE_AMMOPILE_URL,
+    "l4d_percentage_ammopile": L4D_PERCENTAGE_AMMOPILE_URL,
+    "l4d_switch_team_survivor_dead_fix": REMOVE_TOUCH_LINKS_URL,
+    "remove_touch_links": REMOVE_TOUCH_LINKS_URL,
+    "l4d_votes_5": L4D2_VOTE_CHANGE_URL,
+    "l4d2_vote_change": L4D2_VOTE_CHANGE_URL,
+    "pill_passer": L4D_ITEM_PASSER_URL,
+    "l4d_item_passer": L4D_ITEM_PASSER_URL,
+    "pounce_database": L4D_POUNCE_DATABASE_REMAKE_URL,
+    "l4d_pounce_database_remake": L4D_POUNCE_DATABASE_REMAKE_URL,
+    "skeet_database": L4D_SKEET_DATABASE_REMAKE_URL,
+    "l4d_skeet_database_remake": L4D_SKEET_DATABASE_REMAKE_URL,
+    "vocal_block": L4D_VOCALIZE_ANTIFLOOD_URL,
+    "l4d_vocalize_antiflood": L4D_VOCALIZE_ANTIFLOOD_URL,
+    "command_and_convar_buffer_overflow_fixer": COMMAND_BUFFER_URL,
+    "command_buffer": COMMAND_BUFFER_URL,
     "ladder_server_crash_patch_fix": LADDER_PATCH_SP_URL,
     "l4d2_ladder_patch": LADDER_PATCH_SP_URL,
     "l4d_remove_item_collision": REMOVE_ITEM_COLLISION_SP_URL,
@@ -6146,6 +7304,17 @@ CATALOG_URL_OVERRIDES = {
 
 
 def apply_catalog_overrides(item: FixItem) -> None:
+    if is_command_buffer_target(item.name, item.slug, item.url):
+        item.url = COMMAND_BUFFER_URL
+        return
+    old_key = discontinued_plugin_key(item.name, item.slug, item.url)
+    rep = plugin_replacement_of(item.name, item.slug, item.url)
+    if rep:
+        item.slug = rep
+        item.url = require_install_url_for(rep) or REQUIRE_INSTALL_URLS.get(rep, "")
+        if old_key:
+            item.name = f"{rep}（替代 {old_key}）"
+        return
     forced = forced_am_sp_url(item.name, item.slug, item.url)
     if forced:
         item.url = forced
@@ -7063,6 +8232,151 @@ def catalog_require_targets(
     return selected, names
 
 
+CATALOG_ENV_MAPPING: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("left4dhooks", "left 4 dhooks"), "left4dhooks"),
+    (("l4dtoolz", "l4d toolz"), "l4dtoolz"),
+    (("actions", "action"), "actions"),
+    (("dhooks",), "dhooks"),
+    (("sourcescramble", "source scramble"), "sourcescramble"),
+    (("builtinvotes", "builtin votes"), "builtinvotes"),
+    (("collisionhook", "collision hook"), "collisionhook"),
+    (("smlib",), "smlib"),
+    (("linux_auto_restart", "linux auto restart"), "linux_auto_restart"),
+    (("server_loader", "server loader"), "server_loader"),
+    (("smd_advertisements",), "smd_advertisements"),
+    (("smd_dynamichostname", "dynamic hostname"), "smd_dynamichostname"),
+    (("cannounce", "connect announce"), "cannounce"),
+)
+
+
+def find_catalog_remote(
+    item: FixItem, known: dict[str, RemotePlugin]
+) -> RemotePlugin | None:
+    keys = catalog_item_keys(item)
+    for k in keys:
+        if k in known:
+            return known[k]
+    slug = item.slug.lower().replace("-", "_")
+    for name, cand in known.items():
+        if (name in slug or slug in name) and len(name) >= 8:
+            return cand
+    return None
+
+
+def catalog_local_hits(
+    item: FixItem, env: LocalEnv, rp: RemotePlugin | None = None
+) -> list[LocalPlugin]:
+    keys = set(catalog_item_keys(item))
+    if rp is not None:
+        keys |= rp.keys
+    hits: list[LocalPlugin] = []
+    seen: set[str] = set()
+    for lp in env.plugins:
+        name = lp.name.lower()
+        if name not in keys:
+            continue
+        path_key = str(lp.path.resolve())
+        if path_key in seen:
+            continue
+        seen.add(path_key)
+        hits.append(lp)
+    return hits
+
+
+def catalog_item_local_paths(item: FixItem, env: LocalEnv) -> list[Path]:
+    sm = sm_root(env.game_dir)
+    paths: list[Path] = []
+    seen: set[str] = set()
+    for stem in catalog_item_keys(item):
+        for rel in (
+            Path("plugins") / f"{stem}.smx",
+            Path("plugins") / "disabled" / f"{stem}.smx",
+            Path("scripting") / f"{stem}.sp",
+        ):
+            p = sm / rel
+            if not p.is_file():
+                continue
+            key = str(p.resolve())
+            if key in seen:
+                continue
+            seen.add(key)
+            paths.append(p)
+    return paths
+
+
+def repair_catalog_item_assets(item: FixItem, env: LocalEnv) -> list[Path]:
+    """已装插件仍可能缺 gamedata/data，安装或跳过时都再补一次。"""
+    paths = catalog_item_local_paths(item, env)
+    if not paths:
+        return []
+    return ensure_gamedata_for_copied(env.game_dir, paths)
+
+
+def disable_wrong_engine_plugin(env: LocalEnv, stem: str) -> str | None:
+    if not stem or not plugin_wrong_engine(env, stem):
+        return None
+    sm = sm_root(env.game_dir)
+    src = sm / "plugins" / f"{stem}.smx"
+    if not src.is_file():
+        return None
+    dest_dir = sm / "plugins" / "disabled"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
+    try:
+        if dest.exists():
+            dest.unlink()
+        shutil.move(str(src), str(dest))
+    except OSError as e:
+        return f"引擎不匹配但无法禁用 {stem}: {e}"
+    return f"已禁用 {stem}（不支持当前游戏引擎）"
+
+
+def catalog_item_current_skip(
+    item: FixItem,
+    env: LocalEnv,
+    known: dict[str, RemotePlugin],
+    update_configs: bool,
+) -> str | None:
+    """本地已装且无需更新时返回跳过说明，否则 None。"""
+    key = normalize_key(item.name)
+    slug = item.slug.lower()
+    core = resolve_official_core_key(slug, key, item.name)
+    if core == "sourcemod" and env.has_sourcemod:
+        return "本地已有 SourceMod，跳过"
+    if core == "metamod" and env.has_metamod:
+        return "本地已有 MetaMod，跳过"
+    for needles, env_key in CATALOG_ENV_MAPPING:
+        if any(n in key or n in slug for n in needles):
+            if check_requirement(Requirement(name=env_key, url="", slug=env_key), env).ok:
+                return f"本地已有 {env_key}，跳过"
+            return None
+    if is_command_buffer_target(item.name, item.slug, item.url):
+        if _has_plugin(env, "command_buffer"):
+            return "本地已安装 command_buffer，跳过"
+        return None
+    rp = find_catalog_remote(item, known)
+    hits = catalog_local_hits(item, env, rp)
+    if rp is not None:
+        if not hits:
+            return None
+        try:
+            actions = plan_actions([(rp, hits)], env.game_dir, update_configs)
+        except Exception:
+            return None
+        if any(a.kind in {"new", "update"} for a in actions):
+            return None
+        place = hits[0].name
+        return f"本地已安装 {place} 且与仓库一致，跳过"
+    if hits:
+        return f"本地已安装 {hits[0].name}，跳过"
+    sm = sm_root(env.game_dir)
+    for stem in catalog_item_keys(item):
+        for rel in (Path("plugins") / f"{stem}.smx", Path("plugins") / "disabled" / f"{stem}.smx"):
+            if (sm / rel).is_file():
+                return f"本地已安装 {stem}，跳过"
+    return None
+
+
 def try_env_install_for_item(item: FixItem, env: LocalEnv, dry_run: bool) -> str | None:
     key = normalize_key(item.name)
     slug = item.slug.lower()
@@ -7073,22 +8387,7 @@ def try_env_install_for_item(item: FixItem, env: LocalEnv, dry_run: bool) -> str
         if core == "sourcemod":
             return install_env_sourcemod(env.game_dir, pick_version=False)
         return install_env_metamod(env.game_dir, pick_version=False)
-    mapping = (
-        (("left4dhooks", "left 4 dhooks"), "left4dhooks"),
-        (("l4dtoolz", "l4d toolz"), "l4dtoolz"),
-        (("actions", "action"), "actions"),
-        (("dhooks",), "dhooks"),
-        (("sourcescramble", "source scramble"), "sourcescramble"),
-        (("builtinvotes", "builtin votes"), "builtinvotes"),
-        (("collisionhook", "collision hook"), "collisionhook"),
-        (("smlib",), "smlib"),
-        (("linux_auto_restart", "linux auto restart"), "linux_auto_restart"),
-        (("server_loader", "server loader"), "server_loader"),
-        (("smd_advertisements",), "smd_advertisements"),
-        (("smd_dynamichostname", "dynamic hostname"), "smd_dynamichostname"),
-        (("cannounce", "connect announce"), "cannounce"),
-    )
-    for needles, env_key in mapping:
+    for needles, env_key in CATALOG_ENV_MAPPING:
         if any(n in key or n in slug for n in needles):
             fn = lookup_plugin_installer(env_key)
             if not fn:
@@ -7105,25 +8404,38 @@ def install_fix_item(
     known: dict[str, RemotePlugin],
     dry_run: bool,
     update_configs: bool,
+    *,
+    fetch_deps: bool = True,
 ) -> str:
+    only = resolve_plugin_engine_only(env, item.name, item.slug)
+    if only and only != game_engine_id(env.game_dir):
+        if not dry_run:
+            for stem in catalog_item_keys(item):
+                disable_wrong_engine_plugin(env, stem)
+        eng = game_engine_id(env.game_dir).upper()
+        raise RuntimeError(f"{item.name} 仅支持 {only.upper()}，当前 {eng} 不安装")
     env_msg = try_env_install_for_item(item, env, dry_run)
     if env_msg is not None:
         return env_msg
+    prep = remote_for_require_prep(
+        item.name, slug=item.slug, url=item.url, known=known
+    )
+    env = ensure_requires_before_install(
+        [prep], env, dry_run=dry_run, fetch=fetch_deps, quiet_ok=True
+    )
+    if is_command_buffer_target(item.name, item.slug, item.url):
+        if dry_run:
+            return f"预览: 从 GitHub 安装 command_buffer（{COMMAND_BUFFER_URL}）"
+        return with_plugin_extras(
+            [item.slug, item.name, "command_buffer"],
+            env,
+            dry_run,
+            install_command_buffer(env.game_dir),
+        )
     if forced_am_sp_url(item.name, item.slug, item.url):
         req = Requirement(name=item.name, url=item.url, slug=item.slug)
         return try_install_requirement(req, env, dry_run)
-    keys = {item.slug.lower(), item.slug.lower().replace("-", "_"), re.sub(r"[^\w]+", "_", item.name).lower()}
-    rp = None
-    for k in keys:
-        if k in known:
-            rp = known[k]
-            break
-    if rp is None:
-        for name, cand in known.items():
-            if name in item.slug.lower() or item.slug.lower() in name:
-                if len(name) >= 8:
-                    rp = cand
-                    break
+    rp = find_catalog_remote(item, known)
     if rp is not None:
         if dry_run:
             return f"预览: 从已配置仓库 {rp.repo.key}/{rp.name} 安装"
@@ -7164,6 +8476,7 @@ def run_catalog(args: argparse.Namespace, spec: TutorialSpec, pick: bool = False
             f"选择要安装的{spec.title}插件",
             [catalog_pick_label(it) for it in keep],
             empty_hint="至少选择一个插件。",
+            with_select_all=True,
         )
         if idx is None:
             print("已返回。")
@@ -7192,12 +8505,49 @@ def run_catalog(args: argparse.Namespace, spec: TutorialSpec, pick: bool = False
     print("=== 开始安装 ===")
     try:
         for item in keep:
-            print(f"-> {item.name}")
+            shown = False
             try:
-                msg = install_fix_item(item, env, known, False, args.update_configs)
+                # 仅明确写了 only supports L4D1 的才自动禁用，避免误伤 left4dhooks 等
+                for stem in catalog_item_keys(item):
+                    sp_path = sm_root(env.game_dir) / "scripting" / f"{stem}.sp"
+                    if sp_path.is_file() and plugin_engine_only(sp_path) == "l4d1":
+                        disable_wrong_engine_plugin(env, stem)
+                skip = catalog_item_current_skip(
+                    item, env, known, args.update_configs
+                )
+                if skip:
+                    # 已装且无更新时仍补 Require（例如 l4d2_ty_saveweapons → l4d_heartbeat）
+                    if getattr(args, "fetch_deps", True):
+                        prep = remote_for_require_prep(
+                            item.name, slug=item.slug, url=item.url, known=known
+                        )
+                        env = ensure_requires_before_install(
+                            [prep],
+                            env,
+                            dry_run=False,
+                            fetch=True,
+                            quiet_ok=True,
+                        )
+                    repair_catalog_item_assets(item, env)
+                    continue
+                print(f"-> {item.name}")
+                shown = True
+                msg = install_fix_item(
+                    item,
+                    env,
+                    known,
+                    False,
+                    args.update_configs,
+                    fetch_deps=getattr(args, "fetch_deps", True),
+                )
                 print(f"   {msg}")
+                repaired = repair_catalog_item_assets(item, env)
+                if repaired:
+                    print(f"   已补齐依赖文件 {len(repaired)} 个")
                 ok_n += 1
             except Exception as e:
+                if not shown:
+                    print(f"-> {item.name}")
                 print(f"   失败: {e}")
                 if item.url:
                     print(f"   请手动打开: {item.url}")
@@ -7212,13 +8562,13 @@ def run_catalog(args: argparse.Namespace, spec: TutorialSpec, pick: bool = False
         print(f"失败已写入: {LOG_FILE}")
     env = scan_local_env(args.game_dir)
     print()
-    print(f"=== Require 检测（本次{spec.title}清单插件） ===")
+    print(f"=== Require 复查（本次{spec.title}清单插件） ===")
     selected, names = catalog_require_targets(keep, merge_require_index(known))
     groups = print_require_report(selected, env, missing_only=True, local_names=names)
     if not groups:
         print("清单插件的 Require 均已在本地找到。")
         return
-    print(f"\n合计 {len(groups)} 项缺失依赖。")
+    print(f"\n合计仍缺 {len(groups)} 项依赖。")
     if getattr(args, "fetch_deps", True):
         fetch_missing_deps(groups, env, args.dry_run)
         env = scan_local_env(args.game_dir)
@@ -7232,9 +8582,9 @@ def run_catalog(args: argparse.Namespace, spec: TutorialSpec, pick: bool = False
             print(f"\n仍缺 {len(leftover)} 项，需手动安装。")
             print_missing_groups(leftover)
         else:
-            print("\n自动下载后，本次清单插件的 Require 均已满足。")
+            print("\n复查后，本次清单插件的 Require 均已满足。")
     else:
-        print("未自动下载。安装时会一并拉取缺失 Require。")
+        print("未自动下载。安装时会先拉取缺失 Require。")
 
 
 def cmd_fixes(args: argparse.Namespace, pick: bool = False) -> None:
@@ -7745,9 +9095,19 @@ def cmd_sync(args: argparse.Namespace) -> None:
         return
 
     actions = plan_actions(matched, args.game_dir, args.update_configs)
+    # 即使插件文件无需更新，也先补齐缺失 Require（如 ty_saveweapons 的 l4d_heartbeat）
+    to_prep = [rp for rp, _ in matched]
     print(f"将同步 {len(matched)} 个插件, {len(actions)} 个文件")
     if args.dry_run:
         print("（预览模式，不会写入）")
+    if to_prep:
+        env = ensure_requires_before_install(
+            to_prep,
+            env,
+            dry_run=args.dry_run,
+            fetch=args.fetch_deps,
+            quiet_ok=True,
+        )
     counts = apply_actions(actions, args.game_dir, args.dry_run)
     print()
     compiled = counts.get("compiled", 0)
@@ -7764,7 +9124,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
         print("提示: 已存在的 configs/data 默认不覆盖。如需覆盖请加 --update-configs")
 
     print()
-    print("=== Require 检测（仅本次同步的插件，重复项已合并） ===")
+    print("=== Require 复查（仅本次同步的插件） ===")
     synced = [rp for rp, _ in matched]
     sync_names = {k for rp in synced for k in rp.keys}
     env = scan_local_env(args.game_dir)
@@ -7774,7 +9134,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
     if not groups:
         print("已同步插件的 Require 项均已在本地找到。")
     else:
-        print(f"\n合计 {len(groups)} 项缺失依赖。")
+        print(f"\n合计仍缺 {len(groups)} 项依赖。")
         if args.fetch_deps:
             fetch_missing_deps(groups, env, args.dry_run)
             env = scan_local_env(args.game_dir)
@@ -7788,7 +9148,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
                 print(f"\n仍缺 {len(leftover)} 项，需手动安装。")
                 print_missing_groups(leftover)
             else:
-                print("\n自动下载后，检测范围内的 Require 均已满足。")
+                print("\n复查后，检测范围内的 Require 均已满足。")
         else:
             print("未自动下载。加上 --fetch-deps 或运行: python sync_plugins.py check --fetch-deps")
 
@@ -7806,7 +9166,35 @@ def cmd_install(args: argparse.Namespace) -> None:
     print(f"将安装 {len(selected)} 个插件")
     if args.dry_run:
         print("（预览模式，不会写入）")
+    if selected:
+        env = ensure_requires_before_install(
+            selected, env, dry_run=args.dry_run, fetch=args.fetch_deps
+        )
     counts = apply_actions(actions, args.game_dir, args.dry_run)
+    # 停更替代若不在已配置仓库内，按 URL 改装
+    selected_keys = {plugin_key_norm(rp.name) for rp in selected}
+    for n in args.names or []:
+        targets = plugin_replacement_bundle(n)
+        if not targets:
+            rep = plugin_replacement_of(n)
+            targets = [rep] if rep else []
+        for target in targets:
+            if plugin_key_norm(target) in selected_keys:
+                continue
+            url = require_install_url_for(target, args.game_dir)
+            if not url:
+                continue
+            print(f"-> {target}（停更替代）")
+            if args.dry_run:
+                print(f"   预览: 将从 {url} 安装")
+                continue
+            msg = try_install_requirement(
+                Requirement(name=target, url=url, slug=target),
+                env,
+                False,
+            )
+            print(f"   {msg}")
+            env = scan_local_env(args.game_dir)
     compiled = counts.get("compiled", 0)
     print(
         "完成: "
@@ -7817,13 +9205,16 @@ def cmd_install(args: argparse.Namespace) -> None:
         + (f", 编译 {compiled}" if compiled else "")
     )
     print()
-    print("=== Require 检测 ===")
+    print("=== Require 复查 ===")
     install_names = {k for rp in selected for k in rp.keys}
     env = scan_local_env(args.game_dir)
     groups = print_require_report(
-        selected, env, missing_only=False, local_names=install_names
+        selected, env, missing_only=True, local_names=install_names
     )
-    if groups and args.fetch_deps:
+    if not groups:
+        print("本次安装插件的 Require 均已在本地找到。")
+    elif args.fetch_deps:
+        print(f"\n合计仍缺 {len(groups)} 项依赖。")
         fetch_missing_deps(groups, env, args.dry_run)
         env = scan_local_env(args.game_dir)
         leftover = collect_local_gamedata_gaps(
@@ -7836,7 +9227,7 @@ def cmd_install(args: argparse.Namespace) -> None:
             print(f"\n仍缺 {len(leftover)} 项，需手动安装。")
             print_missing_groups(leftover)
         else:
-            print("\n自动下载后，检测范围内的 Require 均已满足。")
+            print("\n复查后，检测范围内的 Require 均已满足。")
 
 
 def cmd_check(args: argparse.Namespace) -> None:
@@ -8113,12 +9504,19 @@ def pick_multi_list(
     allow_empty: bool = False,
     single: bool = False,
     initial_cursor: int = 0,
+    with_select_all: bool = False,
 ) -> list[int] | None:
     if not labels:
         print("没有可选项。")
         return [] if allow_empty else None
+    use_select_all = bool(with_select_all) and not single
+    display = (["全选"] + labels) if use_select_all else labels
     selected = set(initially or ())
-    cursor = max(0, min(int(initial_cursor), len(labels) - 1))
+    # with_select_all 时 display[0] 是「全选」，真实项从 1 起；initial_cursor 仍按真实项下标
+    if use_select_all:
+        cursor = max(0, min(int(initial_cursor) + 1, len(display) - 1))
+    else:
+        cursor = max(0, min(int(initial_cursor), len(display) - 1))
     hint = ""
     offset = 0
     drawn = 0
@@ -8132,6 +9530,14 @@ def pick_multi_list(
         except OSError:
             rows = 25
         return max(8, rows - 8)
+
+    def real_index(display_i: int) -> int | None:
+        if use_select_all:
+            return None if display_i == 0 else display_i - 1
+        return display_i
+
+    def all_selected() -> bool:
+        return len(selected) == len(labels)
 
     def render() -> None:
         nonlocal drawn, offset
@@ -8148,24 +9554,34 @@ def pick_multi_list(
             help_line = "方向键移动，回车进入，Esc 返回"
             status = " "
         else:
-            help_line = "方向键移动，空格选择，回车确认，Esc 返回"
+            help_line = (
+                "方向键移动，空格选择"
+                + ("（首项全选）" if use_select_all else "")
+                + "，回车确认，Esc 返回"
+            )
             status = hint or f"已选 {len(selected)}/{len(labels)}"
         lines = [
             title,
             help_line,
             "",
         ]
-        end = min(len(labels), offset + vis)
+        end = min(len(display), offset + vis)
         if offset > 0:
             lines.append("  ↑ 还有上面的项")
         for i in range(offset, end):
             mark = ">" if i == cursor else " "
+            ri = real_index(i)
             if single:
                 prefix = f"{mark} {i + 1}. "
             else:
-                box = "[*]" if i in selected else "[]"
-                prefix = f"{mark} {i + 1}. {box} "
-            body = labels[i]
+                if ri is None:
+                    box = "[*]" if all_selected() else "[]"
+                else:
+                    box = "[*]" if ri in selected else "[]"
+                # 全选行用 0.，真实项从 1. 起，与返回下标一致
+                num = 0 if ri is None else ri + 1
+                prefix = f"{mark} {num}. {box} "
+            body = display[i]
             room = max(8, cols - 1 - len(prefix))
             if len(body) > room:
                 body = body[: room - 1] + "…"
@@ -8173,7 +9589,7 @@ def pick_multi_list(
             if i == cursor:
                 row = f"\033[7m{row}\033[0m"
             lines.append(row)
-        if end < len(labels):
+        if end < len(display):
             lines.append("  ↓ 还有下面的项")
         lines.append("")
         lines.append(status if single else (hint or f"已选 {len(selected)}/{len(labels)}"))
@@ -8197,20 +9613,26 @@ def pick_multi_list(
             while True:
                 action = keys.read()
                 if action in {"up", "left"}:
-                    cursor = (cursor - 1) % len(labels)
+                    cursor = (cursor - 1) % len(display)
                     hint = ""
                     render()
                 elif action in {"down", "right"}:
-                    cursor = (cursor + 1) % len(labels)
+                    cursor = (cursor + 1) % len(display)
                     hint = ""
                     render()
                 elif action == "space":
                     if single:
                         return [cursor]
-                    if cursor in selected:
-                        selected.remove(cursor)
+                    ri = real_index(cursor)
+                    if ri is None:
+                        if all_selected():
+                            selected.clear()
+                        else:
+                            selected.update(range(len(labels)))
+                    elif ri in selected:
+                        selected.remove(ri)
                     else:
-                        selected.add(cursor)
+                        selected.add(ri)
                     hint = ""
                     render()
                 elif action == "esc":
