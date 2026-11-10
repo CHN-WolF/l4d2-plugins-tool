@@ -1676,6 +1676,18 @@ NEST_SKIP_DIRS = SKIP_REPO_ROOT_DIRS | {
     "particles",
     "scripting_1.11",
     "scripting_1.12",
+    # MoYu 等仓库的旧礼包：整包同步会附带安装一堆对抗插件
+    "old version",
+    "_deprecated",
+    "deprecated",
+}
+# 禁止自动安装/同步的插件（曾被 MoYu Old version 礼包附带装上）
+PLUGIN_INSTALL_BLOCKLIST: set[str] = {
+    "l4d_boss_percent",
+    "l4d2_health_temp_bonus",
+    "l4d2_hybrid_scoremod",
+    "l4d2_score_difference",
+    "l4d2_tank_support",
 }
 
 
@@ -1730,6 +1742,8 @@ def scan_flat_sm_plugins(repo: RepoSpec) -> list[RemotePlugin]:
         key = stem.lower()
         if key in seen:
             continue
+        if is_install_blocked(stem, key):
+            continue
         seen.add(key)
         smx_names = [src.name] if src.suffix.lower() == ".smx" else []
         plugins.append(
@@ -1754,7 +1768,16 @@ def scan_remote_plugins(repo: RepoSpec, *, deep: bool = True) -> list[RemotePlug
         # Also collect smx under left4dead2 tree when content_root fell back
         if not smx_names and (child / "left4dead2").is_dir():
             smx_names = collect_smx(child / "left4dead2" / "addons" / "sourcemod")
+        # 整包若全是屏蔽插件则跳过；混装包保留，安装时再按文件过滤
+        if smx_names and all(is_install_blocked(Path(s).stem) for s in smx_names):
+            continue
+        if not smx_names and is_install_blocked(child.name):
+            continue
         name = derive_plugin_english_name(child, smx_names)
+        if is_install_blocked(name, child.name) and (
+            not smx_names or all(is_install_blocked(Path(s).stem) for s in smx_names)
+        ):
+            continue
         readme = find_readme(child) or find_readme(root)
         requires = parse_requires(readme) if readme else []
         requires = augment_plugin_requires(name, requires, repo)
@@ -1905,6 +1928,42 @@ def scan_local_env(game_dir: Path) -> LocalEnv:
 
 def plugin_key_norm(name: str) -> str:
     return re.sub(r"[^\w]+", "_", (name or "").lower()).strip("_")
+
+
+def is_install_blocked(*names: str) -> bool:
+    """是否在禁止自动安装名单中。"""
+    for raw in names:
+        if not raw:
+            continue
+        key = plugin_key_norm(Path(str(raw)).stem)
+        if key in PLUGIN_INSTALL_BLOCKLIST:
+            return True
+        # foo.phrases / foo.phrases.txt
+        if key.endswith("_phrases"):
+            base = key[: -len("_phrases")]
+            if base in PLUGIN_INSTALL_BLOCKLIST:
+                return True
+    return False
+
+
+def blocked_plugin_file(mapped_root: str, rel: Path) -> bool:
+    """按目标相对路径判断是否属于屏蔽插件文件。"""
+    if not rel or not rel.name:
+        return False
+    root = (mapped_root or "").split(":")[-1].lower()
+    if root not in {
+        "plugins",
+        "scripting",
+        "gamedata",
+        "translations",
+        "configs",
+        "data",
+    }:
+        return False
+    stem = rel.stem
+    if stem.lower().endswith(".phrases"):
+        stem = stem[: -len(".phrases")]
+    return is_install_blocked(stem, rel.name)
 
 
 def plugin_replacement_of(*names: str) -> str | None:
@@ -2298,6 +2357,9 @@ def plan_actions(
         hits: list[LocalPlugin],
         plugin_label: str,
     ) -> None:
+        # 屏蔽名单：不同步/不安装这些插件文件（避免礼包附带安装）
+        if blocked_plugin_file(mapped_root, rel):
+            return
         dest = resolve_dest(game_dir, mapped_root, rel, hits)
         if is_zombie_spawn_fix_manager_config(src) or is_zombie_spawn_fix_manager_config(dest):
             return
@@ -2469,11 +2531,52 @@ def save_plugin_source_choice(identity: str, repo_id: str) -> None:
     )
 
 
+def remote_pack_completeness(rp: RemotePlugin) -> int:
+    """完整度：带 .smx / left4dead2 礼包 优先于仓库里单独的 .sp 镜像。"""
+    score = 0
+    if rp.smx_names:
+        score += 100 + min(20, len(rp.smx_names))
+    path = rp.path
+    if path.is_file():
+        # Nanaka 等仓库常把单文件 .sp 当插件根，完整度最低
+        return score + (2 if path.suffix.lower() == ".sp" else 5)
+    if not path.is_dir():
+        return score
+    name = path.name
+    if DOUBAN_FOLDER_RE.match(name) or PLATFORM_FOLDER_RE.search(name):
+        score += 30
+    if (path / "left4dead2").is_dir():
+        score += 50
+    if (path / "addons" / "sourcemod").is_dir():
+        score += 20
+    if (path / "plugins").is_dir() or (path / "scripting").is_dir():
+        score += 10
+    # 有 cfg / translations 的礼包更完整
+    for sub in ("cfg", "configs", "translations", "gamedata"):
+        if (path / sub).is_dir() or (path / "left4dead2" / sub).is_dir():
+            score += 8
+        sm = path / "left4dead2" / "addons" / "sourcemod" / sub
+        if sm.is_dir():
+            score += 8
+        sm2 = path / "addons" / "sourcemod" / sub
+        if sm2.is_dir():
+            score += 8
+    return score
+
+
 def pick_preferred_remote(cands: list[RemotePlugin]) -> RemotePlugin:
-    for rp in cands:
+    if not cands:
+        raise ValueError("empty candidates")
+    # 同名跨仓：完整礼包（豆瓣 JS-MODS 等）优先于裸 .sp
+    best_score = max(remote_pack_completeness(rp) for rp in cands)
+    rich = [rp for rp in cands if remote_pack_completeness(rp) >= best_score]
+    for rp in rich:
         if repo_owner_repo_id(rp.repo) == PREFERRED_PLUGIN_REPO_ID:
             return rp
-    return sorted(cands, key=lambda r: (r.repo.key.lower(), r.name.lower()))[0]
+    return sorted(
+        rich,
+        key=lambda r: (-remote_pack_completeness(r), r.repo.key.lower(), r.name.lower()),
+    )[0]
 
 
 def local_hits_for_keys(game_dir: Path, keys: set[str]) -> list[LocalPlugin]:
@@ -2550,10 +2653,14 @@ def best_local_matching_remote(
 def pick_default_duplicate_remote(
     cands: list[RemotePlugin], game_dir: Path | None
 ) -> RemotePlugin:
+    preferred = pick_preferred_remote(cands)
     local_match = best_local_matching_remote(cands, game_dir)
-    if local_match is not None:
-        return local_match
-    return pick_preferred_remote(cands)
+    if local_match is None:
+        return preferred
+    # 本地只对上裸 .sp，但另一仓有完整 .smx 礼包时，改用完整包
+    if remote_pack_completeness(preferred) >= remote_pack_completeness(local_match) + 50:
+        return preferred
+    return local_match
 
 
 def remote_content_fingerprint(rp: RemotePlugin) -> str:
@@ -2702,10 +2809,13 @@ def ask_duplicate_plugin_source(
     fps: list[tuple[RemotePlugin, str]],
     *,
     game_dir: Path | None = None,
+    remembered_rp: RemotePlugin | None = None,
 ) -> RemotePlugin:
     cands = [rp for rp, _ in fps]
     local_match = best_local_matching_remote(cands, game_dir)
-    default_rp = local_match or pick_preferred_remote(cands)
+    preferred = pick_preferred_remote(cands)
+    # 光标默认：上次选择 → 当前安装 → 更完整礼包
+    default_rp = remembered_rp or local_match or preferred
     interactive = hasattr(sys.stdin, "isatty") and sys.stdin.isatty()
     if not interactive:
         print(
@@ -2713,15 +2823,20 @@ def ask_duplicate_plugin_source(
             f"{repo_owner_repo_id(default_rp)}"
         )
         return default_rp
+    best_score = max(remote_pack_completeness(rp) for rp in cands)
     labels: list[str] = []
     default_idx = 0
     for i, (rp, _fp) in enumerate(fps):
         rid = repo_owner_repo_id(rp.repo)
         tags: list[str] = []
+        if remembered_rp is not None and rp is remembered_rp:
+            tags.append("上次选择")
         if local_match is not None and rp is local_match:
             tags.append("当前安装")
         if rid == PREFERRED_PLUGIN_REPO_ID:
             tags.append("推荐")
+        if remote_pack_completeness(rp) >= best_score and best_score >= 50:
+            tags.append("完整礼包")
         if rp is default_rp:
             default_idx = i
         tag = f"  [{' / '.join(tags)}]" if tags else ""
@@ -2758,7 +2873,9 @@ def resolve_cross_repo_duplicates(
     local_names: set[str] | None = None,
     game_dir: Path | None = None,
 ) -> list[RemotePlugin]:
-    """同名/同 smx 跨仓库：内容一致则自动保留优先源；仅已安装且不一致时询问。"""
+    """同名/同 smx 跨仓库：内容一致则自动保留优先源；
+    同步/安装（ask=True）且本地已装、内容不一致时每次询问（光标停在上次选择）；
+    仅查询（ask=False）时沿用上次选择或优先完整礼包。"""
     if len(plugins) < 2:
         return plugins
 
@@ -2791,18 +2908,20 @@ def resolve_cross_repo_duplicates(
 
         remembered = choices.get(identity.lower(), "")
         hit = next((rp for rp in cands if repo_owner_repo_id(rp.repo) == remembered), None)
-        if hit is not None:
-            kept.append(hit)
-            remembered_n += 1
-            continue
 
-        # 查询模式，或本地未安装：不打断，直接用优先/当前安装源
+        # 查询模式，或本地未安装：不打断；同步/安装时已装且内容不一致 → 每次询问
         if (not ask) or (not remote_cluster_is_installed(cands, local_names)):
-            kept.append(pick_default_duplicate_remote(cands, game_dir))
-            auto_n += 1
+            if hit is not None:
+                kept.append(hit)
+                remembered_n += 1
+            else:
+                kept.append(pick_default_duplicate_remote(cands, game_dir))
+                auto_n += 1
             continue
 
-        pick = ask_duplicate_plugin_source(identity, fps, game_dir=game_dir)
+        pick = ask_duplicate_plugin_source(
+            identity, fps, game_dir=game_dir, remembered_rp=hit
+        )
         save_plugin_source_choice(identity, repo_owner_repo_id(pick.repo))
         choices[identity.lower()] = repo_owner_repo_id(pick.repo)
         kept.append(pick)
@@ -2944,6 +3063,13 @@ def load_remotes(
 
 
 def filter_by_names(plugins: list[RemotePlugin], names: list[str]) -> list[RemotePlugin]:
+    blocked = [n for n in names if is_install_blocked(n)]
+    if blocked:
+        raise SystemExit(
+            "已禁止安装: "
+            + ", ".join(blocked)
+            + "（对抗/计分相关，勿从 MoYu 旧礼包附带安装）"
+        )
     rewritten: list[str] = []
     for n in names:
         bundle = plugin_replacement_bundle(n)
@@ -4181,6 +4307,10 @@ def copy_sm_tree(src_root: Path, game_dir: Path) -> list[Path]:
         if name in mapping and child.is_dir():
             for file in child.rglob("*"):
                 if file.is_file() and file.name.lower() not in SKIP_FILE_NAMES:
+                    if mapping[name] in {"plugins", "scripting", "gamedata", "translations"} and is_install_blocked(
+                        file.stem
+                    ):
+                        continue
                     dest = sm / mapping[name] / file.relative_to(child)
                     if is_zombie_spawn_fix_manager_config(file) or is_zombie_spawn_fix_manager_config(dest):
                         continue
@@ -8407,6 +8537,10 @@ def install_fix_item(
     *,
     fetch_deps: bool = True,
 ) -> str:
+    if is_install_blocked(item.name, item.slug, *catalog_item_keys(item)):
+        raise RuntimeError(
+            f"已禁止安装 {item.slug or item.name}（对抗/计分相关，勿从旧礼包附带安装）"
+        )
     only = resolve_plugin_engine_only(env, item.name, item.slug)
     if only and only != game_engine_id(env.game_dir):
         if not dry_run:
@@ -9041,7 +9175,19 @@ def cmd_search(args: argparse.Namespace) -> None:
         game_dir=args.game_dir,
     )
     q = args.keyword.lower()
-    hits = [rp for rp in remote if q in rp.name.lower() or any(q in n.lower() for n in rp.smx_names)]
+
+    def _search_blob(rp: RemotePlugin) -> str:
+        parts = [rp.name, *rp.smx_names]
+        if rp.path.is_dir():
+            parts.append(rp.path.name)
+            note = pack_folder_note(rp.path.name)
+            if note:
+                parts.append(note)
+        elif rp.path.is_file():
+            parts.append(rp.path.stem)
+        return " ".join(parts).lower()
+
+    hits = [rp for rp in remote if q in _search_blob(rp)]
     if not hits:
         print(f"没有找到包含「{args.keyword}」的插件")
         return
@@ -9049,7 +9195,9 @@ def cmd_search(args: argparse.Namespace) -> None:
     for rp in hits:
         installed = "已安装" if rp.keys & env.plugin_names else "未安装"
         smx = ", ".join(rp.smx_names) or "-"
-        print(f"  [{rp.repo.key}] [{installed}] {rp.name:40} {smx}")
+        folder = rp.path.name if rp.path.is_dir() else ""
+        extra = f"  {folder}" if folder and folder.lower() != rp.name.lower() else ""
+        print(f"  [{rp.repo.key}] [{installed}] {rp.name:40} {smx}{extra}")
 
 
 def print_sync_by_plugin(
